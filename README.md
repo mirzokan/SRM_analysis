@@ -1,6 +1,6 @@
 # Description
 
-R script that helps to analyse SRM experiments for biomarker discovery. The script takes an output report from Skyline, wrangles the data to a more comprehensible form and calculates some vital statistics. Current features:
+R script for analysis of selected reaction monitoring (SRM) mass spectrometry experiments for biomarker discovery. The script takes an output report from Skyline, wrangles the data to a more comprehensible form and calculates some vital statistics. Current features:
 
 * Produces a volcano plot to find biomarker candidates with significant fold-change between treatments
 * Uses logistical regression to find the best threshold value for each biomarker candidate
