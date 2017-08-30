@@ -17,8 +17,8 @@ library("ROCR")
 
 # ----- Global control variables
 xlOut <- FALSE # Toggle report output
-graphOut <- TRUE # Toggle graph output
-stripOut <- TRUE # Toggle stripchart output
+graphOut <- FALSE # Toggle graph output
+stripOut <- FALSE # Toggle stripchart output
 volcanoOut <- FALSE # Toggle volcano plot output
 logitOut <- FALSE # Toggle logistic regression plot output
 aucOut <- FALSE # Toggle auc plot output
@@ -26,9 +26,13 @@ aucOut <- FALSE # Toggle auc plot output
 thrFC <- 1 # Threshold log2 fold-change 
 thrAlpha <- 0.05 # Alpha threshold for comparative statistics 
 thrLogit <- 0.5 # Probability threshold for the logistic regression 
-optPower <- 0.8 # Optimal statistical power 
+optPower <- 0.8 # Optimal statistical power
 
-filepaths <- list(pepInfo="C:\\Users\\lem\\Dropbox\\LTRI\\2 Tools\\peptide_info.csv",
+stockfmolug <- 40
+
+filepaths <- list(
+			pepInfo="C:\\Users\\lem\\Dropbox\\LTRI\\2 Tools\\peptide_info.csv",
+			pepconc="peptconc.csv",
 			skyline="Sample_Skyline_Results.csv",
 			xloutput="R_report_onetail.xlsx"
 			)
@@ -71,6 +75,7 @@ cthresh <- function(x){
 
 # Load peptide information database
 pepInfo <- read.csv(filepaths$pepInfo)
+pepconc <- read.csv(filepaths$pepconc)
 
 # Load Skyline data
 ds <- read.csv(filepaths$skyline, na.strings="#N/A")
@@ -103,6 +108,7 @@ ds <- ds %>%
 
 # Populate protein name from pepInfo database
 ds <- itranslate(ds, pepInfo, "protein", "peptide")
+ds <- itranslate(ds, pepconc, "fmolug", "peptide")
 
 # Create columns for IS concentration, trial, Precursor and Transition names
 ds <- ds %>% 
@@ -111,11 +117,22 @@ ds <- ds %>%
 	mutate(transitionName = paste0(.$precursorName, "-->", .$fragmentIon, "_", .$productCharge, "+")) %>% 
 	mutate(transitionID = paste0(.$replicateName, "_", .$transitionName)) %>% 
 	mutate(expID=paste(subjectID, condition)) %>% 
-	mutate(expTrID=paste(.$expID, transitionName))
+	mutate(expTrID=paste(.$expID, transitionName)) %>% 
+	mutate(fmoluL = fmolug*stockfmolug)
 
 
 #Reorder columns for convenience
-ds <- ds[c("replicateName", "subjectID", "bioreplicate", "condition", "sampleType", "trial", "protein", "peptide", "peptideMod", "precursorMz", "precursorCharge", "productMz", "productCharge", "fragmentIon", "isotope", "precursorName", "transitionName", "transitionID", "expID", "expTrID", "retentionTime", "area", "background", "ratioLightToHeavy", "fmoluL", "ratioToStandard", "rdotp", "peakRank")]
+ds <- ds[c("replicateName", "subjectID", "bioreplicate", "condition", "sampleType", "trial", "protein", "peptide", "peptideMod", "precursorMz", "precursorCharge", "productMz", "productCharge", "fragmentIon", "isotope", "precursorName", "transitionName", "transitionID", "expID", "expTrID", "retentionTime", "area", "background", "ratioLightToHeavy", "fmolug", "fmoluL", "ratioToStandard", "rdotp", "peakRank")]
+
+# Create lists of unique values of concentrations, transitions and precursors
+UfmoluL <- unique(ds$fmoluL)
+Ufmolug <- unique(ds$fmolug)
+Utransitions <- unique(ds$transitionName)
+Uprecursors <- unique(ds$precursorName)
+Upeptides <- unique(ds$peptide)
+Uproteins <- unique(ds$protein)
+Uisotope <- unique(ds$isotope)
+UsubjectID <- unique(ds$subjectID)
 
 # Create a tidy version of ds
 # Spread columns by isotope label type
@@ -135,16 +152,7 @@ tds <- tds %>%
 	distinct(transitionID, .keep_all=TRUE)
 
 # Reorder columns for convenience
-tds <- tds[c("replicateName", "subjectID", "bioreplicate", "condition", "sampleType", "trial", "protein", "peptide", "peptideMod", "heavyPrecursorMz", "lightPrecursorMz", "heavyProductMz", "lightProductMz", "precursorCharge", "productCharge", "fragmentIon", "precursorName", "transitionName", "transitionID", "expID", "expTrID", "heavyRetentionTime", "lightRetentionTime", "fmoluL", "heavyArea", "lightArea", "heavyBackground", "lightBackground", "heavyPeakRank", "lightPeakRank", "rdotp", "ratioLightToHeavy", "ratioToStandard")]
-
-# Create lists of unique values of concentrations, transitions and precursors
-UfmoluL <- unique(ds$fmoluL)
-Utransitions <- unique(ds$transitionName)
-Uprecursors <- unique(ds$precursorName)
-Upeptides <- unique(ds$peptide)
-Uproteins <- unique(ds$protein)
-Uisotope <- unique(ds$isotope)
-UsubjectID <- unique(ds$subjectID)
+tds <- tds[c("replicateName", "subjectID", "bioreplicate", "condition", "sampleType", "trial", "protein", "peptide", "peptideMod", "heavyPrecursorMz", "lightPrecursorMz", "heavyProductMz", "lightProductMz", "precursorCharge", "productCharge", "fragmentIon", "precursorName", "transitionName", "transitionID", "expID", "expTrID", "heavyRetentionTime", "lightRetentionTime", "fmolug", "fmoluL", "heavyArea", "lightArea", "heavyBackground", "lightBackground", "heavyPeakRank", "lightPeakRank", "rdotp", "ratioLightToHeavy", "ratioToStandard")]
 
 #------------- Retention Time Analysis
 # Calculate mean and standard deviation of Retention time for each precursor and compare differences between light and heavy
@@ -235,9 +243,12 @@ peptideDS <- peptideDS %>%
 peptideDS <- peptideDS[c("pepID", "protein", "stageSpecificity", "peptide", "subjectID", "condition",  "meanLTH", "fmoluL", "concentration_fmul", "molw", "concentration_ugml" ,"conclass")]
 
 
+# ----- Base data wrangling ends
+
+
 # ----- Ranking of patient samples by protein concentrations
 rankDS <- peptideDS %>%
-	filter(condition == "PRE") %>% 
+	filter(condition == "PREvas") %>% 
 	select(protein, subjectID, concentration_fmul) %>% 
 	group_by(protein) %>% 
 	mutate(rank=rank(-concentration_fmul)) %>% 
