@@ -16,7 +16,7 @@ library("boot")
 library("ROCR")
 
 # ----- Global control variables
-xlOut <- FALSE # Toggle report output
+xlOut <- TRUE # Toggle report output
 graphOut <- FALSE # Toggle graph output
 stripOut <- FALSE # Toggle stripchart output
 volcanoOut <- FALSE # Toggle volcano plot output
@@ -28,15 +28,42 @@ thrAlpha <- 0.05 # Alpha threshold for comparative statistics
 thrLogit <- 0.5 # Probability threshold for the logistic regression 
 optPower <- 0.8 # Optimal statistical power
 
-stockfmolug <- 40
+stockuguL <- 40
 
 filepaths <- list(pepInfo="C:\\Users\\lem\\Dropbox\\LTRI\\2 Tools\\peptide_info.csv",
 			skyline="Mirzo_Skyline_Results.csv",
-			xloutput="R_report_onetail.xlsx",
+			xloutput="R_report_stcurve.xlsx",
 			pepconc="peptconc.csv"
 			)
 
 # ----- Functions
+itranslate <- function(x, y, newvar, by){
+	x[newvar] <- y[match(x[[by]], y[[by]]), newvar]
+	return(x)
+}
+
+firstcap <- function(x) {
+	substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+	return(x)
+}
+
+spreadby <- function(new_dt, old_dt, id, spreader, dat){
+	id <- enquo(id)
+	spreader <- enquo(spreader)
+	dat <- enquo(dat)
+	n_id <- quo_name(id)
+	n_spreader <- quo_name(spreader)
+	n_dat <- quo_name(dat)
+
+	new_dt <- old_dt %>% 
+		select(!!id, !!spreader, !!dat) %>% 
+		mutate(!!n_spreader:=paste0(!!spreader, firstcap(n_dat))) %>% 
+		spread_(key=n_spreader, value=n_dat) %>% 
+		left_join(new_dt, ., by=n_id)
+	return(new_dt)
+}
+
+
 # Equation for hyperbolic cut-off threshold in volcano plots
 cthresh <- function(x){
 	c  <-  0.5
@@ -76,19 +103,20 @@ ds <- ds %>%
 		fmoluL = Analyte.Concentration,
 		ratioToStandard = Ratio.To.Standard,
 		rdotp = DotProductLightToHeavy,
-		peakRank = Peak.Rank)
+		peakRank = Peak.Rank
+		)
 
 # Populate protein name from pepInfo database
 ds$protein <- pepInfo$protein[match(ds$peptide, pepInfo$peptide)]
-ds$fmolug <- pepconc$P1[match(ds$peptide, pepconc$peptide)]
+ds$fmolug <- pepconc$fmolug[match(ds$peptide, pepconc$peptide)]
 
 # Create columns for IS concentration, trial, Precursor and Transition names
 ds <- ds %>% 
 	mutate(trial = as.numeric(str_match(.$replicateName, "rep([[:digit:]]+)")[,2])) %>% 
 	mutate(curvePoint = str_match(.$replicateName, "_P([[:digit:]]+_*[[:digit:]]*)-")[,2]) %>% 
 	mutate(curvePoint = as.numeric(gsub("_", ".", curvePoint))) %>% 
-	mutate(fmolug = fmolug*curvePoint) %>% 
-	mutate(fmoluL = fmolug*stockfmolug) %>% 
+	mutate(fmolug = fmolug) %>% 
+	mutate(fmoluL = fmolug*stockuguL) %>% 
 	mutate(precursorName = paste0(.$peptideMod, "_", .$precursorCharge, "+")) %>% 
 	mutate(transitionName = paste0(.$precursorName, "-->", .$fragmentIon, "_", .$productCharge, "+")) %>% 
 	mutate(transitionID = paste0(.$replicateName, "_", .$transitionName)) %>% 
@@ -104,41 +132,12 @@ ds <- ds[c("replicateName", "subjectID", "bioreplicate", "condition", "sampleTyp
 tds <- ds %>% 
 	select(-c(isotope, area, background, peakRank, retentionTime, precursorMz, productMz))
 
-tds <- ds %>% 
-	select(transitionID, isotope, area) %>% 
-	mutate(isotope=paste0(isotope,"Area")) %>% 
-	spread(isotope, area) %>% 
-	left_join(tds, ., by="transitionID")
-
-tds <- ds %>% 
-	select(transitionID, isotope, background) %>% 
-	mutate(isotope=paste0(isotope,"Background")) %>% 
-	spread(isotope, background) %>% 
-	left_join(tds, ., by="transitionID")
-
-tds <- ds %>% 
-	select(transitionID, isotope, peakRank) %>% 
-	mutate(isotope=paste0(isotope,"PeakRank")) %>% 
-	spread(isotope, peakRank) %>% 
-	left_join(tds, ., by="transitionID")
-
-tds <- ds %>% 
-	select(transitionID, isotope, retentionTime) %>% 
-	mutate(isotope=paste0(isotope,"RetentionTime")) %>% 
-	spread(isotope, retentionTime) %>% 
-	left_join(tds, ., by="transitionID")
-
-tds <- ds %>% 
-	select(transitionID, isotope, precursorMz) %>% 
-	mutate(isotope=paste0(isotope,"PrecursorMz")) %>% 
-	spread(isotope, precursorMz) %>% 
-	left_join(tds, ., by="transitionID")
-
-tds <- ds %>% 
-	select(transitionID, isotope, productMz) %>% 
-	mutate(isotope=paste0(isotope,"ProductMz")) %>% 
-	spread(isotope, productMz) %>% 
-	left_join(tds, ., by="transitionID")
+	tds <- spreadby(tds, ds, transitionID, isotope, area)
+	tds <- spreadby(tds, ds, transitionID, isotope, background)
+	tds <- spreadby(tds, ds, transitionID, isotope, retentionTime)
+	tds <- spreadby(tds, ds, transitionID, isotope, peakRank)
+	tds <- spreadby(tds, ds, transitionID, isotope, precursorMz)
+	tds <- spreadby(tds, ds, transitionID, isotope, productMz)
 
 # Remove duplicates created by spreading
 tds <- tds %>% 
@@ -147,7 +146,12 @@ tds <- tds %>%
 # Reorder columns for convenience
 tds <- tds[c("replicateName", "subjectID", "bioreplicate", "condition", "sampleType", "trial", "protein", "peptide", "peptideMod", "heavyPrecursorMz", "lightPrecursorMz", "heavyProductMz", "lightProductMz", "precursorCharge", "productCharge", "fragmentIon", "precursorName", "transitionName", "transitionID", "expID", "expTrID", "heavyRetentionTime", "lightRetentionTime", "curvePoint", "fmoluL", "fmolug", "heavyArea", "lightArea", "heavyBackground", "lightBackground", "heavyPeakRank", "lightPeakRank", "rdotp", "ratioLightToHeavy", "ratioToStandard")]
 
+# Take care of ratioLightToHeavy = 0
+tds <- tds %>% 
+	mutate(ratioLightToHeavy=ifelse(ratioLightToHeavy==0, lightArea/heavyArea, ratioLightToHeavy))
+
 # Create lists of unique values of concentrations, transitions and precursors
+Ufmolug <- unique(ds$fmolug)
 UfmoluL <- unique(ds$fmoluL)
 Utransitions <- unique(ds$transitionName)
 Uprecursors <- unique(ds$precursorName)
@@ -181,140 +185,202 @@ rtDS <- rtDS %>% select(peptide, everything())
 rtDS <- rtDS %>% select(protein, everything())
 
 #------------- Replicate summary
+# repDS <- tds %>% 
+# 	group_by(expTrID) %>% 
+# 	summarise(
+# 		meanHeavyRetentionTime = mean(heavyRetentionTime),
+# 		cvHeavyRetentionTime = sd(heavyRetentionTime)/mean(heavyRetentionTime),
+# 		meanLightRetentionTime = mean(lightRetentionTime),
+# 		cvLightRetentionTime = sd(lightRetentionTime)/mean(lightRetentionTime),
+# 		meanHeavyArea = mean(heavyArea),
+# 		cvHeavyArea = sd(heavyArea)/mean(heavyArea),
+# 		meanLightArea = mean(lightArea),
+# 		cvLightArea = sd(lightArea)/mean(lightArea),
+# 		meanHeavyBackground = mean(heavyBackground),
+# 		cvHeavyBackground = sd(heavyBackground)/mean(heavyBackground),
+# 		meanLightBackground = mean(lightBackground),
+# 		cvLightBackground = sd(lightBackground)/mean(lightBackground),
+# 		meanHeavyPeakRank = mean(heavyPeakRank),
+# 		cvHeavyPeakRank = sd(heavyPeakRank)/mean(heavyPeakRank),
+# 		meanLightPeakRank = mean(lightPeakRank),
+# 		cvLightPeakRank = sd(lightPeakRank)/mean(lightPeakRank),
+# 		meanRdotp = mean(rdotp),
+# 		cvRdotp = sd(rdotp)/mean(rdotp),
+# 		meanRatioLightToHeavy = ifelse(mean(ratioLightToHeavy)==0, mean(lightArea/heavyArea), mean(ratioLightToHeavy)),
+# 		cvRatioLightToHeavy = ifelse(mean(ratioLightToHeavy)==0, sd(lightArea/heavyArea)/mean(lightArea/heavyArea), sd(ratioLightToHeavy)/mean(ratioLightToHeavy)),
+# 		meanRatioHeavyToLight = ifelse(mean(ratioLightToHeavy)==0, mean(heavyArea/lightArea), mean(1/ratioLightToHeavy)),
+# 		cvRatioHeavyToLight = ifelse(mean(ratioLightToHeavy)==0, sd(heavyArea/lightArea)/mean(heavyArea/lightArea), sd(1/ratioLightToHeavy)/mean(1/ratioLightToHeavy)))
+
+
+# # Sort by heavy retention time
+# repDS <- repDS %>% arrange(meanHeavyRetentionTime)
+
+# # Add corresponding protein and peptide names for convenience
+# repDS$fmoluL <- ds$fmoluL[match(repDS$expTrID, ds$expTrID)]
+# repDS$fmolug <- ds$fmolug[match(repDS$expTrID, ds$expTrID)]
+# repDS$protein <- ds$protein[match(repDS$expTrID, ds$expTrID)]
+# repDS$peptide <- ds$peptide[match(repDS$expTrID, ds$expTrID)]
+# repDS$curvePoint <- ds$curvePoint[match(repDS$expTrID, ds$expTrID)]
+
+# # Sort for convenience
+# repDS <- repDS %>% select(peptide, everything())
+# repDS <- repDS %>% select(protein, everything())
+# repDS <- repDS %>% select(curvePoint, everything())
+
 repDS <- tds %>% 
-	group_by(expTrID) %>% 
+	group_by(curvePoint, peptide, trial) %>% 
 	summarise(
-		meanHeavyRetentionTime = mean(heavyRetentionTime),
-		cvHeavyRetentionTime = sd(heavyRetentionTime)/mean(heavyRetentionTime),
-		meanLightRetentionTime = mean(lightRetentionTime),
-		cvLightRetentionTime = sd(lightRetentionTime)/mean(lightRetentionTime),
-		meanHeavyArea = mean(heavyArea),
-		cvHeavyArea = sd(heavyArea)/mean(heavyArea),
-		meanLightArea = mean(lightArea),
-		cvLightArea = sd(lightArea)/mean(lightArea),
-		meanHeavyBackground = mean(heavyBackground),
-		cvHeavyBackground = sd(heavyBackground)/mean(heavyBackground),
-		meanLightBackground = mean(lightBackground),
-		cvLightBackground = sd(lightBackground)/mean(lightBackground),
-		meanHeavyPeakRank = mean(heavyPeakRank),
-		cvHeavyPeakRank = sd(heavyPeakRank)/mean(heavyPeakRank),
-		meanLightPeakRank = mean(lightPeakRank),
-		cvLightPeakRank = sd(lightPeakRank)/mean(lightPeakRank),
-		meanRdotp = mean(rdotp),
-		cvRdotp = sd(rdotp)/mean(rdotp),
-		meanRatioLightToHeavy = mean(ratioLightToHeavy),
-		cvRatioLightToHeavy = sd(ratioLightToHeavy)/mean(ratioLightToHeavy),
-		meanRatioHeavyToLight = mean(1/ratioLightToHeavy),
-		cvRatioHeavyToLight = sd(1/ratioLightToHeavy)/mean(1/ratioLightToHeavy))
-
-# Sort by heavy retention time
-repDS <- repDS %>% arrange(meanHeavyRetentionTime)
-
-# Add corresponding protein and peptide names for convenience
-repDS$fmoluL <- ds$fmoluL[match(repDS$expTrID, ds$expTrID)]
-repDS$fmolug <- ds$fmolug[match(repDS$expTrID, ds$expTrID)]
-repDS$protein <- ds$protein[match(repDS$expTrID, ds$expTrID)]
-repDS$peptide <- ds$peptide[match(repDS$expTrID, ds$expTrID)]
-repDS$curvePoint <- ds$curvePoint[match(repDS$expTrID, ds$expTrID)]
-
-# Sort for convenience
-repDS <- repDS %>% select(peptide, everything())
-repDS <- repDS %>% select(protein, everything())
-repDS <- repDS %>% select(curvePoint, everything())
-
-# ----- Opimal fmolug
-fmolugDS <- tds %>% 
-	filter(curvePoint==1) %>% 
-	group_by(peptide) %>% 
-	summarise(
-		fmolug=mean(fmolug, na.rm=TRUE),
-		fmoluL=mean(fmoluL, na.rm=TRUE),
-		meanLTH = mean(ratioLightToHeavy),
-		cvLTH = sd(ratioLightToHeavy)/mean(ratioLightToHeavy)
-		)  %>% 
-	mutate(optFmolug=round((fmolug*meanLTH)*3, 2)) %>% 
-	mutate(protein=tds$protein[match(.$peptide, tds$peptide)]) %>% 
-	select(protein, everything())
+		fmoluL = mean(fmoluL, na.rm=TRUE),
+		rdotp = mean(rdotp, na.rm=TRUE),
+		LTH = mean(ratioLightToHeavy, na.rm=TRUE)
+		) %>% 
+	mutate(HTL=1/LTH) %>% 
+	mutate(theorHfmul=fmoluL*curvePoint) %>% 
+	mutate(hConcentration_fmul=fmoluL*HTL) %>% 
+	mutate(molw=pepInfo$mw[match(peptide, pepInfo$peptide)]) %>% 
+	mutate(theorHugml=theorHfmul*molw*1e-6) %>% 
+	mutate(hConcentration_ugml=hConcentration_fmul*molw*1e-6) %>% 
+	mutate(protein=pepInfo$protein[match(peptide, pepInfo$peptide)]) %>% 
+	mutate(stageSpecificity=pepInfo$stageSpecificity[match(peptide, pepInfo$peptide)])
 
 
-# ----- Peptide concentrations summary
+# if (graphOut){
+# 	for (i in Upeptides){
+# 		lProtein <- pepInfo$protein[match(i, pepInfo$peptide)]
+# 		lStagel <- pepInfo$stageSpecificity[match(i, pepInfo$peptide)]
+# 		p <- repDS %>% 
+# 			filter(peptide==i) %>% 
+# 			ggplot(aes(x=theorHugml, y=HTL))+
+# 			geom_point(size=2)+
+# 			scale_y_log10()+
+# 			scale_x_log10()+
+# 			labs(title=lProtein, subtitle=sprintf("%s (%s...)", lStagel, substr(i, 1,5)))+
+# 			geom_smooth(method='lm')+
+# 			geom_hline(yintercept=1, linetype="longdash")
 
-peptideDS <- repDS %>% 
+# 		ggsave(paste("g1_", lProtein, "_stcurve.jpg", sep=""), plot=p, device="jpg")
+# 	}
+# }
+	
+stcurveDS <- repDS %>% 
 	group_by(curvePoint, peptide) %>% 
 	summarise(
-		meanLTH=mean(meanRatioLightToHeavy, na.rm=TRUE),
-		meanHTL=1/mean(meanRatioLightToHeavy, na.rm=TRUE),
-		sdHTL=(1/sd(meanRatioLightToHeavy, na.rm=TRUE))/(1/mean(meanRatioLightToHeavy, na.rm=TRUE)),
-		meanHeavyArea=mean(meanHeavyArea, na.rm=TRUE),
-		meanLightArea=mean(meanLightArea, na.rm=TRUE),
-		fmoluL=mean(fmoluL, na.rm=TRUE)) %>% 
-	ungroup()
-
-peptideDS <- peptideDS %>% 	
-	mutate(meanLTH=ifelse(.$meanLTH==0, .$meanLightArea/.$meanHeavyArea, .$meanLTH)) %>% 
-	select(-c(meanLightArea, meanHeavyArea)) %>% 
-	mutate(concentration_fmul=meanLTH*fmoluL) %>% 
-	mutate(molw=pepInfo$mw[match(.$peptide, pepInfo$peptide)]) %>% 
-	mutate(concentration_ugml=concentration_fmul*molw*1e-6) %>% 
-	mutate(protein=pepInfo$protein[match(.$peptide, pepInfo$peptide)]) %>% 
-	mutate(stageSpecificity=pepInfo$stageSpecificity[match(.$peptide, pepInfo$peptide)])
-
-# Sort for convenience
-peptideDS <- peptideDS[c("curvePoint", "protein", "stageSpecificity", "peptide", "meanLTH", "fmoluL", "concentration_fmul", "molw", "concentration_ugml")]
-
-# ----- Standard curve
-
-stcurveDS <- tds %>%
-	group_by(curvePoint, trial, protein) %>% 
-	summarise(
-		ratioHeavyToLight=1/(mean(ratioLightToHeavy, na.rm=TRUE)),
-		fmoluL=mean(fmoluL, na.rm=TRUE)
-		)   %>% 
-	mutate(peptide=pepInfo$peptide[match(protein, pepInfo$protein)])
-
-if (graphOut){
-	for (i in Uproteins){
-		p <- stcurveDS %>% 
-		filter(protein==i) %>% 
-		ggplot(aes(x=fmoluL, y=ratioHeavyToLight))+
-		geom_point(size=2)+
-		scale_y_log10()+
-		scale_x_log10()+
-		labs(title=i, subtitle=pepInfo$peptide[match(i, pepInfo$protein)])+
-		geom_smooth(method='lm')+
-		geom_hline(yintercept=1)
-
-		ggsave(paste("g1_", i, "_stcurve.jpg", sep=""), plot=p, device="jpg")
-	}
-}
-
-stcurve1pDS <- stcurveDS %>% 
-	group_by(curvePoint, protein) %>% 
-	summarise(
-		meanHTL=mean(ratioHeavyToLight, na.rm=TRUE),
-		sdHTL=sd(ratioHeavyToLight, na.rm=TRUE),
-		cvHTL=sd(ratioHeavyToLight, na.rm=TRUE)/mean(ratioHeavyToLight, na.rm=TRUE),
-		fmoluL=mean(fmoluL, na.rm=TRUE)
+		meanHTL=mean(HTL, na.rm=TRUE),
+		sdHTL=sd(HTL, na.rm=TRUE),
+		cvHTL=sd(HTL, na.rm=TRUE)/mean(HTL, na.rm=TRUE),
+		theorHugml=mean(theorHugml, na.rm=TRUE)
 		) %>% 
-	mutate(sdthr=(cvHTL<0.2)) %>% 
-	mutate(peptide=pepInfo$peptide[match(protein, pepInfo$protein)])
+	mutate(protein=pepInfo$protein[match(peptide, pepInfo$peptide)]) %>% 
+	mutate(stageSpecificity=pepInfo$stageSpecificity[match(protein, pepInfo$protein)]) %>% 
+	mutate(sdthr=(cvHTL<0.2))
+
+stcurveDS <- stcurveDS %>% 
+	group_by(peptide) %>% 
+	summarise(maxFcv=max(ifelse(!sdthr,curvePoint,0))) %>% 
+	left_join(stcurveDS, ., by="peptide") %>% 
+	mutate(linlim=pepconc$linlim[match(peptide, pepconc$peptide)]) %>% 
+	mutate(linthr=curvePoint>=linlim) %>% 
+	mutate(sdthr=ifelse(curvePoint<=maxFcv, FALSE, sdthr)) %>% 
+	mutate(cthr=linthr&sdthr) %>% 
+	select(-c(maxFcv, linlim))
+
 
 if (graphOut){
-	for (i in Uproteins){
-		p <- stcurve1pDS %>% 
-		filter(protein==i) %>% 
-		ggplot(aes(x=fmoluL, y=meanHTL, colour=sdthr))+
-		scale_color_manual(values=c("FALSE" = "sienna4", "TRUE" = "green4"))+
-		geom_point(size=2)+
-		scale_y_log10()+
-		scale_x_log10()+
-		labs(title=i, subtitle=pepInfo$peptide[match(i, pepInfo$protein)])+
-		geom_smooth(method="lm")+
-		geom_hline(yintercept=1)
+	for (i in Upeptides){
+		lProtein <- pepInfo$protein[match(i, pepInfo$peptide)]
+		lStagel <- pepInfo$stageSpecificity[match(i, pepInfo$peptide)]
+		p <- stcurveDS %>% 
+			filter(peptide==i) %>% 
+			ggplot(aes(x=theorHugml, y=meanHTL, colour=cthr))+
+			scale_color_manual(values=c("FALSE" = "sienna4", "TRUE" = "green4"))+
+			geom_point(size=2)+
+			geom_errorbar(aes(ymin=meanHTL-sdHTL, ymax=meanHTL+sdHTL), width=.2)+
+			scale_y_log10(breaks=c(0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 100, 300, 1000), labels = scales::comma)+
+			scale_x_log10()+
+			labs(title=lProtein, subtitle=sprintf("%s (%s...)", lStagel, substr(i, 1,5)))+
+			geom_smooth(method="lm", se=FALSE)+
+			# geom_text_repel(aes(label=curvePoint))+
+			xlab(expression("Concentration of heavy IS ("*mu*"g/mL)")) + ylab("Heavy-to-light ratio")+
+			theme(text = element_text(size=15), legend.position="none")+
+			geom_hline(yintercept=1, linetype="longdash")
 
-		ggsave(paste("g1_", i, "_stcurve1p.jpg", sep=""), plot=p, device="jpg")
+		ggsave(paste("g2_", lProtein, "_stcurve1p.jpg", sep=""), plot=p, device="jpg")
 	}
 }
+
+
+loqDS <- stcurveDS %>% 
+	filter(cthr==TRUE) %>% 
+	group_by(peptide) %>% 
+	summarise(
+		loqPoint=min(curvePoint, na.rm=TRUE),
+		loq_ugmL=min(theorHugml)
+		) %>% 
+	mutate(protein=pepInfo$protein[match(peptide, pepInfo$peptide)]) %>% 
+	mutate(stageSpecificity=pepInfo$stageSpecificity[match(peptide, pepInfo$peptide)])
+
+loqDS <- loqDS %>% select(stageSpecificity, everything())
+loqDS <- loqDS %>% select(peptide, everything())
+loqDS <- loqDS %>% select(protein, everything())
+
+# Linear regression
+
+# for (i in Upeptides){
+# lProtein <- pepInfo$protein[match(i, pepInfo$peptide)]
+# lStagel <- pepInfo$stageSpecificity[match(i, pepInfo$peptide)]
+
+# 	curvesub <- stcurveDS %>% 
+# 		filter(peptide==i & sdthr)
+
+# 	linest <- lm(meanHTL~theorHugml, data=curvesub)
+
+# 	# print(i)
+# 	# print(summary(linest)$adj.r.squared)
+
+
+# 	if (graphOut){
+# 		p <- stcurveDS %>% 
+# 			filter(peptide==i) %>% 
+# 			ggplot(aes(x=theorHugml, y=meanHTL, colour=sdthr))+
+# 			scale_color_manual(values=c("FALSE" = "sienna4", "TRUE" = "green4"))+
+# 			geom_point(size=2)+
+# 			geom_errorbar(aes(ymin=meanHTL-sdHTL, ymax=meanHTL+sdHTL), width=.2)+
+# 			scale_y_log10()+
+# 			scale_x_log10()+
+# 			labs(title=lProtein, subtitle=sprintf("%s (%s...)", lStagel, substr(i, 1,5)))+
+# 			geom_smooth(method="lm")+
+# 			geom_hline(yintercept=1, linetype="longdash")
+
+# 		ggsave(paste("g3_", lProtein, "_stcurve1p.jpg", sep=""), plot=p, device="jpg")
+		
+# 	}
+
+# }
+
+
+
+
+# # ----- Opimal fmolug
+# fmolugDS <- tds %>% 
+# 	filter(curvePoint==1) %>% 
+# 	group_by(peptide) %>% 
+# 	summarise(
+# 		fmolug=mean(fmolug, na.rm=TRUE),
+# 		fmoluL=mean(fmoluL, na.rm=TRUE),
+# 		meanLTH = mean(ratioLightToHeavy),
+# 		cvLTH = sd(ratioLightToHeavy)/mean(ratioLightToHeavy)
+# 		)  %>% 
+# 	mutate(optFmolug=round((fmolug*meanLTH)*3, 2)) %>% 
+# 	mutate(protein=tds$protein[match(.$peptide, tds$peptide)]) %>% 
+# 	select(protein, everything())
+
+
+
+
+
+
+
+
 # # ----- Ranking of patient samples by protein concentrations
 # rankDS <- peptideDS %>%
 # 	filter(condition == "PRE") %>% 
@@ -547,12 +613,12 @@ if (graphOut){
 # 	# ggsave("g2_volcano_utest.jpg", plot=p, device="jpg", width=7, height=7)
 # }
 
-# #------------- Output
-# if(xlOut){
-# 		write.xlsx(as.data.frame(rtDS), filepaths$xloutput, sheetName="rtDS", row.names=FALSE)
-# 	for (sheet in c("rankDS", "bioSummary")){
-# 		write.xlsx(as.data.frame(get(sheet)), filepaths$xloutput, sheetName=sheet, row.names=FALSE, append=TRUE)
-# 	}
-# }else{
-# 	# View(bioSummary)
-# }
+#------------- Output
+if(xlOut){
+		write.xlsx(as.data.frame(rtDS), filepaths$xloutput, sheetName="rtDS", row.names=FALSE)
+	for (sheet in c("loqDS", "stcurveDS")){
+		write.xlsx(as.data.frame(get(sheet)), filepaths$xloutput, sheetName=sheet, row.names=FALSE, append=TRUE)
+	}
+}else{
+	# View(bioSummary)
+}
