@@ -21,10 +21,10 @@ library("dunn.test")
 
 # ----- Global control variables
 xl_out <- FALSE
-graph_out <- FALSE
-lod_out <- FALSE
-strip_out <- FALSE
-cormat_out <- FALSE
+graph_out <- TRUE
+lod_out <- TRUE
+strip_out <- TRUE
+cormat_out <- TRUE
 volcano_out <- FALSE
 logit_out <- FALSE
 auc_out <- FALSE
@@ -101,7 +101,7 @@ report_retention_time <- df %>%
 # ----- Lod
 if (graph_out & lod_out){
 	for (target in list_peptides){
-		p <- lod_graph(target,save=TRUE)
+		p <- lod_graph(df_concentration, target,save=TRUE)
 	}
 }
 
@@ -110,37 +110,19 @@ if (graph_out & lod_out){
 if (strip_out & graph_out){
 	for (target in list_peptides){
 		
-		strip_chart(target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, boxplot=TRUE) 
-		# strip_chart(target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, point_label=TRUE) 
-		strip_chart(target, "histology", save=TRUE, boxplot=TRUE) 
-		strip_chart(target, "tese", categories=c("sperm", "spermatids", "no sperm"), save=TRUE, boxplot=TRUE) 
+		strip_chart(df_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, boxplot=TRUE) 
+		# strip_chart(df_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, point_label=TRUE) 
+		strip_chart(df_concentration, target, "histology", save=TRUE, boxplot=TRUE) 
+		strip_chart(df_concentration, target, "tese", categories=c("sperm", "spermatids", "no sperm"), save=TRUE, boxplot=TRUE) 
 	}
-	strip_chart("facet", "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE) 
+	strip_chart(df_concentration, "facet", "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE) 
 }
 
 
 # ----- Protein concentration correlation
 
 if (graph_out & cormat_out){
-	cormat  <-  df_concentration %>% 
-		select(run, protein, concentration_ug_ml) %>% 
-		pivot(., id="run", key="protein", values="concentration_ug_ml", rename=FALSE) %>% 
-		select(-run) %>%
-		round(2) %>%
-		cor() %>% 
-		as.data.frame() %>%
-		tibble::rownames_to_column("protein") %>% 
-		gather(combination, correlation, -protein) %>% 
-		arrange(protein, desc(combination))
-
-	p <- ggplot(data = cormat, aes(x=protein, y=combination, fill=correlation)) + 
-	  geom_tile()+
-	  geom_text(aes(label=round(correlation, 2)), size=2) +
-	  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-	     midpoint = 0, limit = c(-1,1))+
-	  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-	  ggsave("g_correlation_matrix.jpg", plot=p, device="jpg", width=7, height=7)	
+	cormat <- protein_cross_correlation(df_concentration, save=TRUE)	
 }
 
 # ----- Variance Analysis

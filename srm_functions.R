@@ -204,7 +204,7 @@ peptide_concentrations <- function(df_replicate_means){
 
 #  ----- Analysis
 
-lod_graph <- function(target, save=FALSE){
+lod_graph <- function(df_concentration, target, save=FALSE){
 	
 	target_protein <- lib_pep_info$protein[match(target, lib_pep_info$peptide)]
 	stage_label <- lib_pep_info$stage_specificity[match(target, lib_pep_info$peptide)]
@@ -229,7 +229,7 @@ lod_graph <- function(target, save=FALSE){
 		return(p)
 }
 
-strip_chart <- function(target, x, categories=c(), bw=FALSE, point_label=FALSE, boxplot=FALSE, save=FALSE){
+strip_chart <- function(df_concentration, target, x, categories=c(), bw=FALSE, point_label=FALSE, boxplot=FALSE, save=FALSE){
 	
 	x_sym <- sym(x)
 	
@@ -294,7 +294,7 @@ strip_chart <- function(target, x, categories=c(), bw=FALSE, point_label=FALSE, 
 		return(p)
 }
 
-mlod <- function(pepnum, lodp=40, zoom=c(0.2,1.3), lab=0, xzoom=NULL){
+mlod <- function(df_concentration, pepnum, lodp=40, zoom=c(0.2,1.3), lab=0, xzoom=NULL){
 	target <- list_peptides[[pepnum]]
 
 	subD <- df_concentration %>% 
@@ -321,6 +321,33 @@ mlod <- function(pepnum, lodp=40, zoom=c(0.2,1.3), lab=0, xzoom=NULL){
 	print(p)
 	print(nlod)
 }
+
+protein_cross_correlation <- function(df_concentration, save=FALSE){
+	cormat  <-  df_concentration %>% 
+		select(run, protein, concentration_ug_ml) %>% 
+		pivot(., id="run", key="protein", values="concentration_ug_ml", rename=FALSE) %>% 
+		select(-run) %>%
+		round(2) %>%
+		cor() %>% 
+		as.data.frame() %>%
+		tibble::rownames_to_column("protein") %>% 
+		gather(combination, correlation, -protein) %>% 
+		arrange(protein, desc(combination))
+
+	p <- ggplot(data = cormat, aes(x=protein, y=combination, fill=correlation)) + 
+	  geom_tile()+
+	  geom_text(aes(label=round(correlation, 2)), size=2) +
+	  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+	     midpoint = 0, limit = c(-1,1))+
+	  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+	if(save){
+		ggsave("g_correlation_matrix.jpg", plot=p, device="jpg", width=7, height=7)
+	} else {
+		return(p)
+	}
+}
+
 
 anova_posthoc <- function(df, group_by){
 
@@ -445,4 +472,6 @@ normal_hist <- function(df, var, binwidth=1){
 qq_plot <- function(df, var, colour=NULL){
 	p <- ggplot(df, aes_string(sample=var, colour=colour))+
 		stat_qq()
+
+	return(p)
 }
