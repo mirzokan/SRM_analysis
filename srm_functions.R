@@ -1,3 +1,70 @@
+load_skyline <- function(file_paths, remove_botched=FALSE, botched_list=c()){
+
+	df <- read.csv(file_paths$skyline, na.strings="#N/A")
+	lib_pep_conc <- read.csv(file_paths$lib_pep_conc)
+
+	# ----- Data wrangling
+	df %<>% rename(
+		replicate_name = Replicate.Name,
+		fmol_ul = Analyte.Concentration,
+		peptide = Peptide.Sequence,
+		peptide_mods = Peptide.Modified.Sequence,
+		sample_type = Sample.Type,
+		isotope = Isotope.Label.Type,
+		precursor_mz = Precursor.Mz,
+		precursor_charge = Precursor.Charge,
+		product_mz = Product.Mz,
+		product_charge = Product.Charge,
+		fragment_ion = Fragment.Ion,
+		retention_time = Retention.Time,
+		area = Area,
+		max_height = Max.Height,
+		background = Background,
+		lth = RatioLightToHeavy,
+		rdotp = DotProductLightToHeavy,
+		transition_rank = Peak.Rank)
+
+	df <- lib_pep_info %>% 
+		select(peptide, protein) %>% 
+		left_join(df, ., by="peptide")
+
+	df <- lib_pep_conc %>% 
+		select(peptide, fmol_ug, loq_ug_ml, lod) %>% 
+		left_join(df, ., by="peptide")
+
+	df %<>%  
+		mutate(run = as.numeric(str_match(.$replicate_name, "^([[:digit:]]+)_")[,2])) %>% 
+		mutate(trial = as.numeric(str_match(.$replicate_name, "rep([[:digit:]]+)")[,2])) %>% 
+		mutate(precursor_name = paste0(.$peptide_mod, "_", .$precursor_charge, "+")) %>% 
+		mutate(transition_name = paste0(.$precursor_name, "-->", .$fragment_ion, "_", .$product_charge, "+")) %>% 
+		mutate(sampleID = paste(subjectID, condition, timepoint, sep="_")) %>% 
+		mutate(experimentID = paste(.$sampleID, curvepoint, sep="_")) %>% 
+		mutate(experiment_transitionID = paste0(experimentID, "_", .$transition_name)) %>% 
+		mutate(experiment_peptideID = paste0(experimentID, "_", .$peptide)) %>% 
+		mutate(transitionID = paste0(run, "_", .$transition_name)) %>% 
+		mutate(fmol_ul = fmol_ug*stock_fmol_ug)
+
+	# Remove botched samples
+	if (remove_botched){
+		df %<>%  
+			filter(!(subjectID %in% botched_list))
+	}
+
+	df %<>%  
+		mutate(area=ifelse(is.na(area), 0, area)) %>% 
+		mutate(background=ifelse(background==0, 1, background)) %>% 
+		mutate(background=ifelse(is.na(background), 1, background)) %>% 
+		mutate(lth=ifelse(is.na(lth), 0, lth)) %>% 
+		mutate(rdotp=ifelse(is.na(rdotp), 0, rdotp)) %>% 
+		mutate(max_height=ifelse(is.na(max_height), 0, max_height)) %>% 
+		mutate(transition_rank=ifelse(is.na(transition_rank), 0, transition_rank)) %>% 
+		mutate(retention_time=ifelse(is.na(retention_time), 0, retention_time))
+
+	return(df)
+}
+
+
+
 # Equation for hyperbolic cut-off threshold in volcano plots
 cthresh <- function(x){
 	c  <-  0.5
