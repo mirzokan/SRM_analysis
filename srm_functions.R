@@ -1,5 +1,3 @@
-
-
 # Equation for hyperbolic cut-off threshold in volcano plots
 cthresh <- function(x){
 	c  <-  0.5
@@ -54,7 +52,7 @@ pivot <- function(df, id, key, values, rename=TRUE){
 
 #  ----- Wrangling
 
-load_skyline <- function(file_paths, remove_botched=FALSE, botched_list=c()){
+load_skyline <- function(file_paths, set, remove_botched=FALSE, botched_list=c()){
 
 	df <- read.csv(file_paths$skyline, na.strings="#N/A")
 	lib_pep_conc <- read.csv(file_paths$lib_pep_conc)
@@ -89,15 +87,17 @@ load_skyline <- function(file_paths, remove_botched=FALSE, botched_list=c()){
 		left_join(df, ., by="peptide")
 
 	df %<>%  
+		mutate(set = set) %>% 
 		mutate(run = as.numeric(str_match(.$replicate_name, "^([[:digit:]]+)_")[,2])) %>% 
-		mutate(trial = as.numeric(str_match(.$replicate_name, "rep([[:digit:]]+)")[,2])) %>% 
+		mutate(trial = as.numeric(str_match(.$replicate_name, "rep([[:digit:]]+)")[,2])) %>%
+		mutate(sampleID = paste(subjectID, condition, timepoint, sep="_")) %>% 
+		mutate(experimentID = paste(.$sampleID, curvepoint, .$set,  sep="_")) %>% 
+		mutate(measurementID = paste(.$experimentID, .$run, sep="_")) %>% 
 		mutate(precursor_name = paste0(.$peptide_mod, "_", .$precursor_charge, "+")) %>% 
 		mutate(transition_name = paste0(.$precursor_name, "-->", .$fragment_ion, "_", .$product_charge, "+")) %>% 
-		mutate(sampleID = paste(subjectID, condition, timepoint, sep="_")) %>% 
-		mutate(experimentID = paste(.$sampleID, curvepoint, sep="_")) %>% 
 		mutate(experiment_transitionID = paste0(experimentID, "_", .$transition_name)) %>% 
 		mutate(experiment_peptideID = paste0(experimentID, "_", .$peptide)) %>% 
-		mutate(transitionID = paste0(run, "_", .$transition_name)) %>% 
+		mutate(measurement_transitionID = paste0(.$measurementID, "_", .$transition_name)) %>% 
 		mutate(fmol_ul = fmol_ug*stock_fmol_ug)
 
 	# Remove botched samples
@@ -199,6 +199,29 @@ peptide_concentrations <- function(df_replicate_means){
 		arrange(peptide, -concentration_ug_ml)
 	return(df_concentration)
 }
+
+
+rt_analysis <- function(df_tidy){
+	report_retention_time <- df_tidy %>% 
+	group_by(precursor_name) %>% 
+	summarise(
+	mean_heavy_retention_time=mean(heavy_retention_time),
+	cv_heavy_retention_time=percent(sd(heavy_retention_time)/mean(heavy_retention_time)),
+	mean_light_retention_time=mean(light_retention_time),
+	cv_light_retention_time=percent(sd(light_retention_time)/mean(light_retention_time))) %>% 
+	mutate(mean_lh_rt_diff=abs(.$mean_heavy_retention_time-.$mean_light_retention_time)) 
+
+
+	report_retention_time <- df_tidy %>% 
+		select(precursor_name, protein, peptide) %>% 
+		distinct(precursor_name, .keep_all=TRUE) %>% 
+		left_join(report_retention_time, ., by="precursor_name") %>% 
+		pop_columns(c("precursor_name", "protein", "peptide")) %>% 
+		arrange(mean_heavy_retention_time)
+
+	return(report_retention_time)
+
+	}
 
 
 
@@ -455,8 +478,6 @@ kruskal_dunn <- function(df, group_by){
 	out <- list(kruskal=significant_kruskal, dunn=dunn_results)
 	return(out)
 }
-
-
 
 
 # Diagnostic plots

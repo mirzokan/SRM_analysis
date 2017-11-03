@@ -21,10 +21,10 @@ library("dunn.test")
 
 # ----- Global control variables
 xl_out <- FALSE
-graph_out <- TRUE
-lod_out <- TRUE
-strip_out <- TRUE
-cormat_out <- TRUE
+graph_out <- FALSE
+lod_out <- FALSE
+strip_out <- FALSE
+cormat_out <- FALSE
 volcano_out <- FALSE
 logit_out <- FALSE
 auc_out <- FALSE
@@ -53,18 +53,26 @@ lib_stage_info <- read.csv(lib_paths$lib_stage_info)
 
 
 # ------ Wranglign one Set
+set1 <- "patient_samples"
+
 patient_samples_files <- list(
 			skyline="Sample_Skyline_Results.csv",
-			lib_pep_conc="peptconc.csv",
-			xloutput="R_report.xlsx"
+			lib_pep_conc="peptconc.csv"
 			)
+
 patient_samples_botched_list <- c("PCASV-013", "PCASV-032", "PCASV-020")
 
-df <- load_skyline(patient_samples_files, remove_botched=TRUE, botched_list=patient_samples_botched_list)
+df <- load_skyline(patient_samples_files, set=set1, remove_botched=TRUE, botched_list=patient_samples_botched_list)
 
-df_tidy <- pivot(df, id="transitionID", key="isotope", values=c("area", "background", "max_height", "transition_rank", "retention_time", "precursor_mz", "product_mz"))
+df_tidy <- pivot(df, id="measurement_transitionID", key="isotope", values=c("area", "background", "max_height", "transition_rank", "retention_time", "precursor_mz", "product_mz"))
 
 list_peptides <- unique(df_tidy$peptide)
+
+# ----- Base Wrangling Ends
+
+
+
+
 
 #------------- Replicate averaging
 replicates <- replicate_average(df_tidy)
@@ -75,27 +83,8 @@ df_replicate_cv <- replicates[["cv"]]
 # ----- Peptide concentrations summary
 df_concentration <- peptide_concentrations(df_replicate_means)
 
-# ----- Base Wrangling Ends
-
-
 #------------- Retention Time Analysis
-report_retention_time <- df_tidy %>% 
-group_by(precursor_name) %>% 
-summarise(
-mean_heavy_retention_time=mean(heavy_retention_time),
-cv_heavy_retention_time=percent(sd(heavy_retention_time)/mean(heavy_retention_time)),
-mean_light_retention_time=mean(light_retention_time),
-cv_light_retention_time=percent(sd(light_retention_time)/mean(light_retention_time))) %>% 
-mutate(mean_lh_rt_diff=abs(.$mean_heavy_retention_time-.$mean_light_retention_time)) 
-
-
-report_retention_time <- df %>% 
-	select(precursor_name, protein, peptide) %>% 
-	distinct(precursor_name, .keep_all=TRUE) %>% 
-	left_join(report_retention_time, ., by="precursor_name") %>% 
-	pop_columns(c("precursor_name", "protein", "peptide")) %>% 
-	arrange(mean_heavy_retention_time)
-
+report_retention_time <- rt_analysis(df_tidy)
 
 
 # ----- Lod
@@ -118,9 +107,7 @@ if (strip_out & graph_out){
 	strip_chart(df_concentration, "facet", "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE) 
 }
 
-
 # ----- Protein concentration correlation
-
 if (graph_out & cormat_out){
 	cormat <- protein_cross_correlation(df_concentration, save=TRUE)	
 }
