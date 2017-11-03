@@ -21,7 +21,7 @@ library("dunn.test")
 
 # ----- Global control variables
 xl_out <- FALSE
-graph_out <- TRUE
+graph_out <- FALSE
 lod_out <- FALSE
 strip_out <- FALSE
 cormat_out <- FALSE
@@ -54,7 +54,7 @@ lib_stage_info <- read.csv(lib_paths$lib_stage_info)
 
 # ------ Load Data
 patient_samples_files <- list(
-			skyline="Mirzo_Skyline_Results.csv",
+			skyline="Sample_Skyline_Results.csv",
 			lib_pep_conc="peptconc.csv",
 			xloutput="R_report.xlsx"
 			)
@@ -68,39 +68,10 @@ df_tidy <- pivot(df, id="transitionID", key="isotope", values=c("area", "backgro
 list_peptides <- unique(df_tidy$peptide)
 
 #------------- Replicate averaging
-df_replicate_means <- df_tidy %>% 
-	group_by(experiment_transitionID) %>% 
-	summarise(
-		heavy_retention_time = mean(heavy_retention_time),
-		light_retention_time = mean(light_retention_time),
-		heavy_area = mean(heavy_area),
-		light_area = mean(light_area),
-		heavy_background = mean(heavy_background),
-		light_background = mean(light_background),
-		heavy_max_height = mean(heavy_max_height),
-		light_max_height = mean(light_max_height),
-		rdotp = mean(rdotp),
-		lth = mean(lth))
+replicates <- replicate_average(df_tidy)
 
-df_replicate_means <- df_tidy %>% 
-	select(experiment_transitionID, experiment_peptideID, experimentID, heavy_transition_rank, peptide) %>% 
-	distinct(experiment_transitionID, .keep_all=TRUE) %>% 
-	left_join(df_replicate_means, ., by="experiment_transitionID") 
-
-df_replicate_cv <- df_tidy %>% 
-	group_by(experiment_transitionID) %>% 
-	summarise(
-		heavy_retention_time = percent(sd(heavy_retention_time)/mean(heavy_retention_time)),
-		light_retention_time = percent(sd(light_retention_time)/mean(light_retention_time)),
-		heavy_area = percent(sd(heavy_area)/mean(heavy_area)),
-		light_area = percent(sd(light_area)/mean(light_area)),
-		heavy_background = percent(sd(heavy_background)/mean(heavy_background)),
-		light_background = percent(sd(light_background)/mean(light_background)),
-		heavy_max_height = percent(sd(heavy_max_height)/mean(heavy_max_height)),
-		light_max_height = percent(sd(light_max_height)/mean(light_max_height)),
-		rdotp = percent(sd(rdotp)/mean(rdotp)),
-		lth = percent(sd(lth)/mean(lth)))
-
+df_replicate_means <- replicates[["means"]]
+df_replicate_cv <- replicates[["cv"]]
 
 # ----- Peptide concentrations summary
 

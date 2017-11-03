@@ -63,6 +63,47 @@ load_skyline <- function(file_paths, remove_botched=FALSE, botched_list=c()){
 	return(df)
 }
 
+replicate_average <- function(df_tidy){
+	df_replicate_means <- df_tidy %>% 
+		group_by(experiment_transitionID) %>% 
+		summarise(
+			heavy_retention_time = mean(heavy_retention_time),
+			light_retention_time = mean(light_retention_time),
+			heavy_area = mean(heavy_area),
+			light_area = mean(light_area),
+			heavy_background = mean(heavy_background),
+			light_background = mean(light_background),
+			heavy_max_height = mean(heavy_max_height),
+			light_max_height = mean(light_max_height),
+			rdotp = mean(rdotp),
+			lth = mean(lth))
+
+	df_replicate_means <- df_tidy %>% 
+		select(experiment_transitionID, experiment_peptideID, experimentID, heavy_transition_rank, peptide) %>% 
+		distinct(experiment_transitionID, .keep_all=TRUE) %>% 
+		left_join(df_replicate_means, ., by="experiment_transitionID") 
+
+	df_replicate_cv <- df_tidy %>% 
+		group_by(experiment_transitionID) %>% 
+		summarise(
+			heavy_retention_time = percent(sd(heavy_retention_time)/mean(heavy_retention_time)),
+			light_retention_time = percent(sd(light_retention_time)/mean(light_retention_time)),
+			heavy_area = percent(sd(heavy_area)/mean(heavy_area)),
+			light_area = percent(sd(light_area)/mean(light_area)),
+			heavy_background = percent(sd(heavy_background)/mean(heavy_background)),
+			light_background = percent(sd(light_background)/mean(light_background)),
+			heavy_max_height = percent(sd(heavy_max_height)/mean(heavy_max_height)),
+			light_max_height = percent(sd(light_max_height)/mean(light_max_height)),
+			rdotp = percent(sd(rdotp)/mean(rdotp)),
+			lth = percent(sd(lth)/mean(lth)))
+
+		output <- list(
+					means=df_replicate_means,
+					cv=df_replicate_cv
+			)
+		return(output)
+}
+
 
 
 # Equation for hyperbolic cut-off threshold in volcano plots
@@ -293,8 +334,8 @@ anova_posthoc <- function(df, group_by){
 			bind_rows(tukey_results,.)
 	}
 
-	out <- list(anova=significant_anova, duncan=duncan_results, tukey=tukey_results)
-	return(out)
+	output <- list(anova=significant_anova, duncan=duncan_results, tukey=tukey_results)
+	return(output)
 }
 
 kruskal_dunn <- function(df, group_by){
