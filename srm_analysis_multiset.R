@@ -21,10 +21,10 @@ library("dunn.test")
 
 # ----- Global control variables
 xl_out <- FALSE
-graph_out <- FALSE
-lod_out <- FALSE
-strip_out <- FALSE
-cormat_out <- FALSE
+graph_out <- TRUE
+lod_out <- TRUE
+strip_out <- TRUE
+cormat_out <- TRUE
 volcano_out <- FALSE
 logit_out <- FALSE
 auc_out <- FALSE
@@ -62,11 +62,11 @@ patient_samples_files <- list(
 
 patient_samples_botched_list <- c("PCASV-013", "PCASV-032", "PCASV-020")
 
-df <- load_skyline(patient_samples_files, set=set1, remove_botched=TRUE, botched_list=patient_samples_botched_list)
+df1 <- load_skyline(patient_samples_files, set=set1, remove_botched=TRUE, botched_list=patient_samples_botched_list)
 
-df_tidy <- pivot(df, id="measurement_transitionID", key="isotope", values=c("area", "background", "max_height", "transition_rank", "retention_time", "precursor_mz", "product_mz"))
+df1_tidy <- pivot(df1, id="measurement_transitionID", key="isotope", values=c("area", "background", "max_height", "transition_rank", "retention_time", "precursor_mz", "product_mz"))
 
-list_peptides <- unique(df_tidy$peptide)
+list_peptides <- unique(df1_tidy$peptide)
 
 # ----- Base Wrangling Ends
 
@@ -75,22 +75,22 @@ list_peptides <- unique(df_tidy$peptide)
 
 
 #------------- Replicate averaging
-replicates <- replicate_average(df_tidy)
+replicates <- replicate_average(df1_tidy)
 
-df_replicate_means <- replicates[["means"]]
-df_replicate_cv <- replicates[["cv"]]
+df1_replicate_means <- replicates[["means"]]
+df1_replicate_cv <- replicates[["cv"]]
 
 # ----- Peptide concentrations summary
-df_concentration <- peptide_concentrations(df_replicate_means)
+df1_concentration <- peptide_concentrations(df1_replicate_means, df1_tidy)
 
 #------------- Retention Time Analysis
-report_retention_time <- rt_analysis(df_tidy)
+report_retention_time <- rt_analysis(df1_tidy)
 
 
 # ----- Lod
 if (graph_out & lod_out){
 	for (target in list_peptides){
-		p <- lod_graph(df_concentration, target,save=TRUE)
+		p <- lod_graph(df1_concentration, target,save=TRUE)
 	}
 }
 
@@ -99,50 +99,50 @@ if (graph_out & lod_out){
 if (strip_out & graph_out){
 	for (target in list_peptides){
 		
-		strip_chart(df_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, boxplot=TRUE) 
-		# strip_chart(df_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, point_label=TRUE) 
-		strip_chart(df_concentration, target, "histology", save=TRUE, boxplot=TRUE) 
-		strip_chart(df_concentration, target, "tese", categories=c("sperm", "spermatids", "no sperm"), save=TRUE, boxplot=TRUE) 
+		strip_chart(df1_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, boxplot=TRUE) 
+		# strip_chart(df1_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, point_label=TRUE) 
+		strip_chart(df1_concentration, target, "histology", save=TRUE, boxplot=TRUE) 
+		strip_chart(df1_concentration, target, "tese", categories=c("sperm", "spermatids", "no sperm"), save=TRUE, boxplot=TRUE) 
 	}
-	strip_chart(df_concentration, "facet", "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE) 
+	strip_chart(df1_concentration, "facet", "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE) 
 }
 
 # ----- Protein concentration correlation
 if (graph_out & cormat_out){
-	cormat <- protein_cross_correlation(df_concentration, save=TRUE)	
+	cormat <- protein_cross_correlation(df1_concentration, save=TRUE)	
 }
 
 # ----- Variance Analysis
-noa_anova <- df_concentration %>% 
+noa_anova <- df1_concentration %>% 
 	select(peptide, subjectID, histology, concentration_ug_ml) %>% 
 	filter(!histology=="unknown") %>%
 	anova_posthoc("histology") 
 
 
-noa_kruskal <- df_concentration %>% 
+noa_kruskal <- df1_concentration %>% 
 	select(peptide, subjectID, histology, concentration_ug_ml) %>% 
 	filter(!histology=="unknown") %>%
 	kruskal_dunn("histology") 
 
 
-condition_kruskal <- df_concentration %>% 
+condition_kruskal <- df1_concentration %>% 
 	select(peptide, subjectID, condition, concentration_ug_ml) %>% 
 	kruskal_dunn("condition") 	
 
 # ----- Epididymal
 
-epi_anova <- df_concentration %>% 
+epi_anova <- df1_concentration %>% 
 	filter(stage_specificity=="Epididymus") %>% 
 	mutate(condition=ifelse(condition %in% c("POSTvas"), "OA", condition)) %>% 
 	anova_posthoc("condition")
 
-epi_kruskal <- df_concentration %>% 
+epi_kruskal <- df1_concentration %>% 
 	filter(stage_specificity=="Epididymus") %>% 
 	mutate(condition=ifelse(condition %in% c("POSTvas"), "OA", condition)) %>% 
 	kruskal_dunn("condition") 	
 
 # ----- Ranking of patient samples by protein concentrations
-report_sample_ranks <- df_concentration %>%
+report_sample_ranks <- df1_concentration %>%
 	select(protein, sampleID, concentration_fm_ul) %>% 
 	group_by(protein) %>% 
 	mutate(rank=rank(-concentration_fm_ul)) %>% 

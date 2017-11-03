@@ -162,7 +162,7 @@ replicate_average <- function(df_tidy){
 }
 
 
-peptide_concentrations <- function(df_replicate_means){
+peptide_concentrations <- function(df_replicate_means, df_tidy){
 	df_concentration <- df_replicate_means %>% 
 		filter(heavy_transition_rank==1) %>% 
 		group_by(experiment_peptideID) %>% 
@@ -179,7 +179,7 @@ peptide_concentrations <- function(df_replicate_means){
 		ungroup()
 
 
-	df_concentration <- df %>% 
+	df_concentration <- df_tidy %>% 
 		select(run, condition, protein, histology, tese, texlevel, subjectID, sampleID, peptide, experiment_peptideID, fmol_ul, loq_ug_ml, lod) %>% 
 		distinct(experiment_peptideID, .keep_all=TRUE) %>% 
 		left_join(df_concentration, ., by="experiment_peptideID") 
