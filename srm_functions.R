@@ -1,3 +1,59 @@
+
+
+# Equation for hyperbolic cut-off threshold in volcano plots
+cthresh <- function(x){
+	c  <-  0.5
+	c/(abs(x-thrFC))+(-log10(thrAlpha))
+} 
+
+percent <- function(x, digits = 2, format = "f", ...) {
+  paste0(formatC(100 * x, format = format, digits = digits, ...), "%")
+}
+
+firstcap <- function(x) {
+	substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+	return(x)
+}
+
+pop_columns <- function(df, columns){
+	columns_reversed <- rev(columns)
+	for (column in columns_reversed){
+		column_s <- sym(column)
+		df %<>% select(!!column_s, everything()) 
+	}
+	return(df)
+}
+
+pivot <- function(df, id, key, values, rename=TRUE){
+	id_sym <- sym(id)
+	key_sym <- sym(key)
+	key_name <- quo_name(key)
+
+	remove_columns <- syms(c(key, values))
+	new_df <- df %>% select(-c(!!!remove_columns))
+
+	for (value in values){
+		value_sym <- sym(value)
+
+		intermediate_df <- df %>%
+			select(!!id_sym, !!key_sym, !!value_sym)
+		
+		if(rename){
+			intermediate_df %<>% mutate(!!key_name:=paste0((!!key_sym), "_", value))
+		}
+		
+		new_df <- intermediate_df %>% 
+			spread(key=(!!key_sym), value=(!!value_sym)) %>% 
+			left_join(new_df, ., by=id)
+	}
+
+	new_df %<>% distinct(!!id_sym, .keep_all=TRUE)
+
+	return(new_df)
+}
+
+#  ----- Wrangling
+
 load_skyline <- function(file_paths, remove_botched=FALSE, botched_list=c()){
 
 	df <- read.csv(file_paths$skyline, na.strings="#N/A")
@@ -63,6 +119,7 @@ load_skyline <- function(file_paths, remove_botched=FALSE, botched_list=c()){
 	return(df)
 }
 
+
 replicate_average <- function(df_tidy){
 	df_replicate_means <- df_tidy %>% 
 		group_by(experiment_transitionID) %>% 
@@ -105,58 +162,47 @@ replicate_average <- function(df_tidy){
 }
 
 
+peptide_concentrations <- function(df_replicate_means){
+	df_concentration <- df_replicate_means %>% 
+		filter(heavy_transition_rank==1) %>% 
+		group_by(experiment_peptideID) %>% 
+		summarise(
+			lth = mean(lth),
+			heavy_area = mean(heavy_area),
+			light_area = mean(light_area),
+			heavy_background = mean(heavy_background),
+			light_background = mean(light_background),
+			heavy_max_height = mean(heavy_max_height),
+			light_max_height = mean(light_max_height),
+			rdotp = mean(rdotp),
+			lh_rt_diff = abs(mean(light_retention_time) - mean(heavy_retention_time))) %>% 
+		ungroup()
 
-# Equation for hyperbolic cut-off threshold in volcano plots
-cthresh <- function(x){
-	c  <-  0.5
-	c/(abs(x-thrFC))+(-log10(thrAlpha))
-} 
 
-percent <- function(x, digits = 2, format = "f", ...) {
-  paste0(formatC(100 * x, format = format, digits = digits, ...), "%")
+	df_concentration <- df %>% 
+		select(run, condition, protein, histology, tese, texlevel, subjectID, sampleID, peptide, experiment_peptideID, fmol_ul, loq_ug_ml, lod) %>% 
+		distinct(experiment_peptideID, .keep_all=TRUE) %>% 
+		left_join(df_concentration, ., by="experiment_peptideID") 
+
+
+		df_concentration %<>%  
+		mutate(heavy_snr=heavy_area/heavy_background) %>% 
+		mutate(light_snr=light_area/light_background) %>% 
+		select(-c(light_area, heavy_area)) %>% 
+		mutate(concentration_fm_ul=lth*fmol_ul) %>% 
+		mutate(molecular_weigth=lib_pep_info$mw[match(.$peptide, lib_pep_info$peptide)]) %>% 
+		mutate(concentration_ug_ml=concentration_fm_ul*molecular_weigth*1e-6) %>% 
+		mutate(protein=lib_pep_info$protein[match(.$peptide, lib_pep_info$peptide)]) %>% 
+		mutate(stage_specificity=lib_pep_info$stage_specificity[match(.$peptide, lib_pep_info$peptide)]) %>%
+		mutate(lh_rt_diffRel=ifelse(is.na(lh_rt_diff), 1, lh_rt_diff/max(.$lh_rt_diff))) %>% 
+		pop_columns(c("run", "peptide", "protein", "stage_specificity", "subjectID", "condition", "histology", "tese", "texlevel", "rdotp", "concentration_fm_ul", "concentration_ug_ml")) %>% 
+		arrange(peptide, -concentration_ug_ml)
+	return(df_concentration)
 }
 
-firstcap <- function(x) {
-	substr(x, 1, 1) <- toupper(substr(x, 1, 1))
-	return(x)
-}
 
-pop_columns <- function(df, columns){
-	columns_reversed <- rev(columns)
-	for (column in columns_reversed){
-		column_s <- sym(column)
-		df %<>% select(!!column_s, everything()) 
-	}
-	return(df)
-}
 
-pivot <- function(df, id, key, values, rename=TRUE){
-	id_sym <- sym(id)
-	key_sym <- sym(key)
-	key_name <- quo_name(key)
-
-	remove_columns <- syms(c(key, values))
-	new_df <- df %>% select(-c(!!!remove_columns))
-
-	for (value in values){
-		value_sym <- sym(value)
-
-		intermediate_df <- df %>%
-			select(!!id_sym, !!key_sym, !!value_sym)
-		
-		if(rename){
-			intermediate_df %<>% mutate(!!key_name:=paste0((!!key_sym), "_", value))
-		}
-		
-		new_df <- intermediate_df %>% 
-			spread(key=(!!key_sym), value=(!!value_sym)) %>% 
-			left_join(new_df, ., by=id)
-	}
-
-	new_df %<>% distinct(!!id_sym, .keep_all=TRUE)
-
-	return(new_df)
-}
+#  ----- Analysis
 
 lod_graph <- function(target, save=FALSE){
 	
