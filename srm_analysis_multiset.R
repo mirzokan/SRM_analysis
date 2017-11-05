@@ -21,7 +21,7 @@ library("dunn.test")
 
 # ----- Global control variables
 xl_out <- FALSE
-graph_out <- TRUE
+graph_out <- FALSE
 lod_out <- TRUE
 strip_out <- TRUE
 cormat_out <- TRUE

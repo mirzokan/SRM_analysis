@@ -13,15 +13,6 @@ firstcap <- function(x) {
 	return(x)
 }
 
-pop_columns <- function(df, columns){
-	columns_reversed <- rev(columns)
-	for (column in columns_reversed){
-		column_s <- sym(column)
-		df %<>% select(!!column_s, everything()) 
-	}
-	return(df)
-}
-
 pivot <- function(df, id, key, values, rename=TRUE){
 	id_sym <- sym(id)
 	key_sym <- sym(key)
@@ -194,8 +185,8 @@ peptide_concentrations <- function(df_replicate_means, df_tidy){
 		mutate(concentration_ug_ml=concentration_fm_ul*molecular_weigth*1e-6) %>% 
 		mutate(protein=lib_pep_info$protein[match(.$peptide, lib_pep_info$peptide)]) %>% 
 		mutate(stage_specificity=lib_pep_info$stage_specificity[match(.$peptide, lib_pep_info$peptide)]) %>%
-		mutate(lh_rt_diffRel=ifelse(is.na(lh_rt_diff), 1, lh_rt_diff/max(.$lh_rt_diff))) %>% 
-		pop_columns(c("run", "peptide", "protein", "stage_specificity", "subjectID", "condition", "histology", "tese", "texlevel", "rdotp", "concentration_fm_ul", "concentration_ug_ml")) %>% 
+		mutate(lh_rt_diffRel=ifelse(is.na(lh_rt_diff), 1, lh_rt_diff/max(.$lh_rt_diff))) %>%
+		select(run, peptide, protein, stage_specificity, subjectID, condition, histology, tese, texlevel, rdotp, concentration_fm_ul, concentration_ug_ml, everything()) %>% 
 		arrange(peptide, -concentration_ug_ml)
 	return(df_concentration)
 }
@@ -216,7 +207,7 @@ rt_analysis <- function(df_tidy){
 		select(precursor_name, protein, peptide) %>% 
 		distinct(precursor_name, .keep_all=TRUE) %>% 
 		left_join(report_retention_time, ., by="precursor_name") %>% 
-		pop_columns(c("precursor_name", "protein", "peptide")) %>% 
+		select(precursor_name, protein, peptide, everything()) %>% 
 		arrange(mean_heavy_retention_time)
 
 	return(report_retention_time)
@@ -417,7 +408,7 @@ anova_posthoc <- function(df, group_by){
 			select(p) %>% 
 			tibble::rownames_to_column("combinations") %>%
 			mutate(peptide=target) %>% 
-			pop_columns("peptide") %>% 
+			select(peptide, everything()) %>% 
 			bind_rows(duncan_results,.)
 
 		# Tukey
@@ -426,7 +417,7 @@ anova_posthoc <- function(df, group_by){
 			rename(p=value) %>% 
 			tibble::rownames_to_column("combinations") %>%
 			mutate(peptide=target) %>% 
-			pop_columns("peptide") %>% 
+			select(peptide, everything()) %>% 
 			bind_rows(tukey_results,.)
 	}
 
