@@ -94,7 +94,7 @@ load_skyline <- function(file_paths, set, remove_botched=FALSE, botched_list=c()
 	# Remove botched samples
 	if (remove_botched){
 		df %<>%  
-			filter(!(subjectID %in% botched_list))
+			filter(!(run %in% botched_list))
 	}
 
 	df %<>%  

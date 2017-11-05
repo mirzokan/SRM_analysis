@@ -60,7 +60,7 @@ patient_samples_files <- list(
 			lib_pep_conc="peptconc.csv"
 			)
 
-patient_samples_botched_list <- c("PCASV-013", "PCASV-032", "PCASV-020")
+patient_samples_botched_list <- c(134,135,114,115,116,117)
 
 df1 <- load_skyline(patient_samples_files, set=set1, remove_botched=TRUE, botched_list=patient_samples_botched_list)
 
