@@ -1,6 +1,5 @@
 # Equation for hyperbolic cut-off threshold in volcano plots
-cthresh <- function(x){
-	c  <-  0.5
+cthresh <- function(x, c=0.5){
 	c/(abs(x-thrFC))+(-log10(thrAlpha))
 } 
 
@@ -94,7 +93,7 @@ load_skyline <- function(file_paths, set, remove_botched=FALSE, botched_list=c()
 	# Remove botched samples
 	if (remove_botched){
 		df %<>%  
-			filter(!(subjectID %in% botched_list))
+			filter(!(run %in% botched_list))
 	}
 
 	df %<>%  

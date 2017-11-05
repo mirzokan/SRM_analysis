@@ -50,8 +50,6 @@ source("C:\\Users\\lem\\Documents\\Git\\SRM_analysis\\srm_functions.R")
 lib_pep_info <- read.csv(lib_paths$lib_pep_info)
 lib_stage_info <- read.csv(lib_paths$lib_stage_info)
 
-
-
 # ------ Wranglign one Set
 set1 <- "patient_samples"
 
@@ -60,7 +58,7 @@ patient_samples_files <- list(
 			lib_pep_conc="peptconc.csv"
 			)
 
-patient_samples_botched_list <- c("PCASV-013", "PCASV-032", "PCASV-020")
+patient_samples_botched_list <- c(134,135,114,115,116,117)
 
 df1 <- load_skyline(patient_samples_files, set=set1, remove_botched=TRUE, botched_list=patient_samples_botched_list)
 
@@ -69,9 +67,6 @@ df1_tidy <- pivot(df1, id="measurement_transitionID", key="isotope", values=c("a
 list_peptides <- unique(df1_tidy$peptide)
 
 # ----- Base Wrangling Ends
-
-
-
 
 
 #------------- Replicate averaging
