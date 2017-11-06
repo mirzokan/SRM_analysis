@@ -110,6 +110,13 @@ load_skyline <- function(file_paths, set, remove_botched=FALSE, botched_list=c()
 }
 
 
+tidify_df <- function(df){
+	df_tidy <- pivot(df, id="measurement_transitionID", key="isotope", values=c("area", "background", "max_height", "transition_rank", "retention_time", "precursor_mz", "product_mz"))
+	return(df_tidy)
+
+}
+
+
 replicate_average <- function(df_tidy){
 	df_replicate_means <- df_tidy %>% 
 		group_by(experiment_transitionID) %>% 
@@ -170,7 +177,7 @@ peptide_concentrations <- function(df_replicate_means, df_tidy){
 
 
 	df_concentration <- df_tidy %>% 
-		select(run, condition, protein, histology, tese, texlevel, subjectID, sampleID, peptide, experiment_peptideID, fmol_ul, loq_ug_ml, lod) %>% 
+		select(set, run, condition, protein, histology, tese, texlevel, subjectID, sampleID, peptide, experiment_peptideID, fmol_ul, loq_ug_ml, lod) %>% 
 		distinct(experiment_peptideID, .keep_all=TRUE) %>% 
 		left_join(df_concentration, ., by="experiment_peptideID") 
 
@@ -185,7 +192,7 @@ peptide_concentrations <- function(df_replicate_means, df_tidy){
 		mutate(protein=lib_pep_info$protein[match(.$peptide, lib_pep_info$peptide)]) %>% 
 		mutate(stage_specificity=lib_pep_info$stage_specificity[match(.$peptide, lib_pep_info$peptide)]) %>%
 		mutate(lh_rt_diffRel=ifelse(is.na(lh_rt_diff), 1, lh_rt_diff/max(.$lh_rt_diff))) %>%
-		select(run, peptide, protein, stage_specificity, subjectID, condition, histology, tese, texlevel, rdotp, concentration_fm_ul, concentration_ug_ml, everything()) %>% 
+		select(set, run, peptide, protein, stage_specificity, subjectID, condition, histology, tese, texlevel, rdotp, concentration_fm_ul, concentration_ug_ml, everything()) %>% 
 		arrange(peptide, -concentration_ug_ml)
 	return(df_concentration)
 }

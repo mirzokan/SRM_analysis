@@ -50,103 +50,163 @@ source("C:\\Users\\lem\\Documents\\Git\\SRM_analysis\\srm_functions.R")
 lib_pep_info <- read.csv(lib_paths$lib_pep_info)
 lib_stage_info <- read.csv(lib_paths$lib_stage_info)
 
-# ------ Wranglign one Set
-set1 <- "patient_samples"
+# ------ Wranglign data
+set1 <- "matched_pre-post"
+set1_files <- list(
+			skyline="C:\\Users\\lem\\Dropbox\\LTRI\\0 Projects\\NextGen Infertility Markers\\Results\\2017-07-27 PM20 Pre-Post\\06 Reanalysis\\Mirzo_Skyline_Results.csv",
+			lib_pep_conc="C:\\Users\\lem\\Dropbox\\LTRI\\0 Projects\\NextGen Infertility Markers\\Results\\2017-07-27 PM20 Pre-Post\\06 Reanalysis\\peptconc.csv"
+			)
+set1_botched_list <- c()
 
-patient_samples_files <- list(
-			skyline="Sample_Skyline_Results.csv",
-			lib_pep_conc="peptconc.csv"
+df_set1 <- load_skyline(set1_files, set=set1, remove_botched=FALSE)
+df_tidy_set1 <- tidify_df(df_set1)
+
+
+
+set2 <- "regular_NOA"
+set2_files <- list(
+			skyline="C:\\Users\\lem\\Dropbox\\LTRI\\0 Projects\\NextGen Infertility Markers\\Results\\2017-08-22 PM20 Patient Samples\\06 reanalysis\\Mirzo_Skyline_Results.csv",
+			lib_pep_conc="C:\\Users\\lem\\Dropbox\\LTRI\\0 Projects\\NextGen Infertility Markers\\Results\\2017-08-22 PM20 Patient Samples\\06 reanalysis\\peptconc.csv"
+			)
+set2_botched_list <- c(134,135,114,115,116,117)
+
+df_set2 <- load_skyline(set2_files, set=set2, remove_botched=FALSE, botched_list=set2_botched_list)
+df_tidy_set2 <- tidify_df(df_set2)
+
+
+set3 <- "longitutional_study"
+set3_files <- list(
+			skyline="C:\\Users\\lem\\Dropbox\\LTRI\\0 Projects\\NextGen Infertility Markers\\Results\\2017-09-18 TEX101 longitutional\\06 Reanalysis\\Mirzo_Skyline_Results.csv",
+			lib_pep_conc="C:\\Users\\lem\\Dropbox\\LTRI\\0 Projects\\NextGen Infertility Markers\\Results\\2017-09-18 TEX101 longitutional\\06 Reanalysis\\peptconc.csv"
 			)
 
-patient_samples_botched_list <- c(134,135,114,115,116,117)
+# set3_botched_list <- c(24, 26, 28, 37, 40, 42, 44, 49, 51, 53, 55, 76, 78, 80, 82, 105, 107, 109, 130, 132, 134, 136, 159, 161, 163, 184, 186, 188, 190, 208, 211, 213)
 
-df1 <- load_skyline(patient_samples_files, set=set1, remove_botched=TRUE, botched_list=patient_samples_botched_list)
+df_set3 <- load_skyline(set3_files, set=set3, remove_botched=FALSE, botched_list=set3_botched_list)
+df_tidy_set3 <- tidify_df(df_set3)
 
-df1_tidy <- pivot(df1, id="measurement_transitionID", key="isotope", values=c("area", "background", "max_height", "transition_rank", "retention_time", "precursor_mz", "product_mz"))
 
-list_peptides <- unique(df1_tidy$peptide)
+
+
+set4 <- "calibration_curve"
+set4_files <- list(
+			skyline="C:\\Users\\lem\\Dropbox\\LTRI\\0 Projects\\NextGen Infertility Markers\\Results\\2017-08-21 Calibration curve\\06 Reanalysis\\Mirzo_Skyline_Results.csv",
+			lib_pep_conc="C:\\Users\\lem\\Dropbox\\LTRI\\0 Projects\\NextGen Infertility Markers\\Results\\2017-08-21 Calibration curve\\06 Reanalysis\\peptconc.csv"
+			)
+
+df_set4 <- load_skyline(set4_files, set=set4, remove_botched=FALSE)
+df_tidy_set4 <- tidify_df(df_set4)
+
+df_combined <- bind_rows(df_set1, df_set2, df_set3)
+df_tidy_combined <- bind_rows(df_tidy_set1, df_tidy_set2, df_tidy_set3)
+
+df_tidy_combined  %<>% select(replicate_name, set, run, trial, subjectID, condition, histology, timepoint, tese, texlevel, curvepoint, peptide, protein, everything())
+
+rm(df_set1, df_set2, df_set3, df_tidy_set1, df_tidy_set2, df_tidy_set3)
+
+list_peptides <- unique(df_tidy_combined$peptide)
 
 # ----- Base Wrangling Ends
 
 
 #------------- Replicate averaging
-replicates <- replicate_average(df1_tidy)
+replicates <- replicate_average(df_tidy_combined)
 
-df1_replicate_means <- replicates[["means"]]
-df1_replicate_cv <- replicates[["cv"]]
+df_combined_replicate_means <- replicates[["means"]]
+df_combined_replicate_cv <- replicates[["cv"]]
 
 # ----- Peptide concentrations summary
-df1_concentration <- peptide_concentrations(df1_replicate_means, df1_tidy)
+df_combined_concentration <- peptide_concentrations(df_combined_replicate_means, df_tidy_combined)
 
 #------------- Retention Time Analysis
-report_retention_time <- rt_analysis(df1_tidy)
+report_retention_time <- rt_analysis(df_tidy_combined)
 
 
 # ----- Lod
 if (graph_out & lod_out){
 	for (target in list_peptides){
-		p <- lod_graph(df1_concentration, target,save=TRUE)
+		p <- lod_graph(df_combined_concentration, target,save=TRUE)
 	}
 }
 
 
-# ------ Stripchars
-if (strip_out & graph_out){
-	for (target in list_peptides){
+# # ------ Stripchars
+# if (strip_out & graph_out){
+# 	for (target in list_peptides){
 		
-		strip_chart(df1_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, boxplot=TRUE) 
-		# strip_chart(df1_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, point_label=TRUE) 
-		strip_chart(df1_concentration, target, "histology", save=TRUE, boxplot=TRUE) 
-		strip_chart(df1_concentration, target, "tese", categories=c("sperm", "spermatids", "no sperm"), save=TRUE, boxplot=TRUE) 
-	}
-	strip_chart(df1_concentration, "facet", "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE) 
-}
+# 		strip_chart(df_combined_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, boxplot=TRUE) 
+# 		# strip_chart(df_combined_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, point_label=TRUE) 
+# 		strip_chart(df_combined_concentration, target, "histology", save=TRUE, boxplot=TRUE) 
+# 		strip_chart(df_combined_concentration, target, "tese", categories=c("sperm", "spermatids", "no sperm"), save=TRUE, boxplot=TRUE) 
+# 	}
+# 	strip_chart(df_combined_concentration, "facet", "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE) 
+# }
 
-# ----- Protein concentration correlation
-if (graph_out & cormat_out){
-	cormat <- protein_cross_correlation(df1_concentration, save=TRUE)	
-}
+# # ----- Protein concentration correlation
+# if (graph_out & cormat_out){
+# 	cormat <- protein_cross_correlation(df_combined_concentration, save=TRUE)	
+# }
 
-# ----- Variance Analysis
-noa_anova <- df1_concentration %>% 
-	select(peptide, subjectID, histology, concentration_ug_ml) %>% 
-	filter(!histology=="unknown") %>%
-	anova_posthoc("histology") 
-
-
-noa_kruskal <- df1_concentration %>% 
-	select(peptide, subjectID, histology, concentration_ug_ml) %>% 
-	filter(!histology=="unknown") %>%
-	kruskal_dunn("histology") 
+# # ----- Variance Analysis
+# noa_anova <- df_combined_concentration %>% 
+# 	select(peptide, subjectID, histology, concentration_ug_ml) %>% 
+# 	filter(!histology=="unknown") %>%
+# 	anova_posthoc("histology") 
 
 
-condition_kruskal <- df1_concentration %>% 
-	select(peptide, subjectID, condition, concentration_ug_ml) %>% 
-	kruskal_dunn("condition") 	
+# noa_kruskal <- df_combined_concentration %>% 
+# 	select(peptide, subjectID, histology, concentration_ug_ml) %>% 
+# 	filter(!histology=="unknown") %>%
+# 	kruskal_dunn("histology") 
 
-# ----- Epididymal
 
-epi_anova <- df1_concentration %>% 
-	filter(stage_specificity=="Epididymus") %>% 
-	mutate(condition=ifelse(condition %in% c("POSTvas"), "OA", condition)) %>% 
-	anova_posthoc("condition")
+# condition_kruskal <- df_combined_concentration %>% 
+# 	select(peptide, subjectID, condition, concentration_ug_ml) %>% 
+# 	kruskal_dunn("condition") 	
 
-epi_kruskal <- df1_concentration %>% 
-	filter(stage_specificity=="Epididymus") %>% 
-	mutate(condition=ifelse(condition %in% c("POSTvas"), "OA", condition)) %>% 
-	kruskal_dunn("condition") 	
+# # ----- Epididymal
 
-# ----- Ranking of patient samples by protein concentrations
-report_sample_ranks <- df1_concentration %>%
-	select(protein, sampleID, concentration_fm_ul) %>% 
-	group_by(protein) %>% 
-	mutate(rank=rank(-concentration_fm_ul)) %>% 
-	ungroup() %>%
-	select(-concentration_fm_ul) %>%  
-	spread(protein, rank) %>%
-	mutate(rankSum=rowSums(.[2:21])) %>% 
-	mutate(rank=dense_rank(rankSum)) %>%  
-	arrange(rankSum)
+# epi_anova <- df_combined_concentration %>% 
+# 	filter(stage_specificity=="Epididymus") %>% 
+# 	mutate(condition=ifelse(condition %in% c("POSTvas"), "OA", condition)) %>% 
+# 	anova_posthoc("condition")
+
+# epi_kruskal <- df_combined_concentration %>% 
+# 	filter(stage_specificity=="Epididymus") %>% 
+# 	mutate(condition=ifelse(condition %in% c("POSTvas"), "OA", condition)) %>% 
+# 	kruskal_dunn("condition") 	
+
+# # ----- Ranking of patient samples by protein concentrations
+# report_sample_ranks <- df_combined_concentration %>%
+# 	select(protein, sampleID, concentration_fm_ul) %>% 
+# 	group_by(protein) %>% 
+# 	mutate(rank=rank(-concentration_fm_ul)) %>% 
+# 	ungroup() %>%
+# 	select(-concentration_fm_ul) %>%  
+# 	spread(protein, rank) %>%
+# 	mutate(rankSum=rowSums(.[2:21])) %>% 
+# 	mutate(rank=dense_rank(rankSum)) %>%  
+# 	arrange(rankSum)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ----- Epi AUROC analysis
