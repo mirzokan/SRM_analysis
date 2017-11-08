@@ -345,15 +345,20 @@ mlod <- function(df_concentration, pepnum, lodp=40, zoom=c(0.2,1.3), lab=0, xzoo
 
 protein_cross_correlation <- function(df_concentration, save=FALSE){
 	cormat  <-  df_concentration %>% 
-		select(run, protein, concentration_ug_ml) %>% 
-		pivot(., id="run", key="protein", values="concentration_ug_ml", rename=FALSE) %>% 
-		select(-run) %>%
+		select(run, set, protein, concentration_ug_ml) %>% 
+		mutate(setrun=paste0(set, run)) %>%
+		select(-c(set, run)) %>% 
+		# View() %T>%
+		pivot(., id="setrun", key="protein", values="concentration_ug_ml", rename=FALSE) %>%
+		select(-setrun) %>%
+		replace(is.na(.), 0) %>%   
 		round(2) %>%
 		cor() %>% 
 		as.data.frame() %>%
 		tibble::rownames_to_column("protein") %>% 
 		gather(combination, correlation, -protein) %>% 
 		arrange(protein, desc(combination))
+
 
 	p <- ggplot(data = cormat, aes(x=protein, y=combination, fill=correlation)) + 
 	  geom_tile()+

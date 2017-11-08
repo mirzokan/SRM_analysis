@@ -23,7 +23,7 @@ library("dunn.test")
 xl_out <- FALSE
 graph_out <- TRUE
 lod_out <- FALSE
-strip_out <- TRUE
+strip_out <- FALSE
 cormat_out <- TRUE
 volcano_out <- FALSE
 logit_out <- FALSE
@@ -134,18 +134,18 @@ if (graph_out & lod_out){
 if (strip_out & graph_out){
 	for (target in list_peptides){
 		
-		# strip_chart(df_combined_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, boxplot=TRUE) 
+		strip_chart(df_combined_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, boxplot=TRUE) 
 		# strip_chart(df_combined_concentration, target, "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE, point_label=TRUE) 
-		# strip_chart(df_combined_concentration, target, "histology", save=TRUE, boxplot=TRUE) 
-		# strip_chart(df_combined_concentration, target, "tese", categories=c("sperm", "spermatids", "no sperm"), save=TRUE, boxplot=TRUE) 
+		strip_chart(df_combined_concentration, target, "histology", save=TRUE, boxplot=TRUE)
+		strip_chart(df_combined_concentration, target, "tese", categories=c("sperm", "spermatids", "no sperm"), save=TRUE, boxplot=TRUE) 
 	}
 	strip_chart(df_combined_concentration, "facet", "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE) 
 }
 
 # ----- Protein concentration correlation
-# if (graph_out & cormat_out){
-# 	cormat <- protein_cross_correlation(df_combined_concentration, save=TRUE)	
-# }
+if (graph_out & cormat_out){
+	cormat <- protein_cross_correlation(df_combined_concentration, save=TRUE)	
+}
 
 # # ----- Variance Analysis
 # noa_anova <- df_combined_concentration %>% 
