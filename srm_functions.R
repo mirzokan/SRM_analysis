@@ -256,6 +256,7 @@ strip_chart <- function(df_concentration, target, x, categories=c(), bw=FALSE, p
 	subD <- df_concentration %>% 
 		filter(!((!!x_sym)=="unknown"))
 
+
 	if(!target=="facet"){
 	
 		target_protein <- lib_pep_info$protein[match(target, lib_pep_info$peptide)]
