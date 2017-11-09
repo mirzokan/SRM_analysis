@@ -147,22 +147,41 @@ if (graph_out & cormat_out){
 	cormat <- protein_cross_correlation(df_combined_concentration, save=TRUE)	
 }
 
-# # ----- Variance Analysis
-# noa_anova <- df_combined_concentration %>% 
-# 	select(peptide, subjectID, histology, concentration_ug_ml) %>% 
-# 	filter(!histology=="unknown") %>%
-# 	anova_posthoc("histology") 
+# ----- Variance Analysis
+histology_anova <- df_combined_concentration %>% 
+	select(peptide, subjectID, histology, concentration_ug_ml) %>% 
+	filter(!histology=="unknown") %>%
+	anova_posthoc("histology") 
 
 
-# noa_kruskal <- df_combined_concentration %>% 
-# 	select(peptide, subjectID, histology, concentration_ug_ml) %>% 
-# 	filter(!histology=="unknown") %>%
-# 	kruskal_dunn("histology") 
+histology_kruskal <- df_combined_concentration %>% 
+	select(peptide, subjectID, histology, concentration_ug_ml) %>% 
+	filter(!histology=="unknown") %>%
+	kruskal_dunn("histology") 
 
 
-# condition_kruskal <- df_combined_concentration %>% 
-# 	select(peptide, subjectID, condition, concentration_ug_ml) %>% 
-# 	kruskal_dunn("condition") 	
+condition_anova <- df_combined_concentration %>% 
+	select(peptide, subjectID, condition, concentration_ug_ml) %>% 
+	filter(!condition=="unknown") %>%
+	anova_posthoc("condition")
+
+condition_kruskal <- df_combined_concentration %>% 
+	select(peptide, subjectID, condition, concentration_ug_ml) %>% 
+	filter(!condition=="unknown") %>%
+	kruskal_dunn("condition") 	
+
+
+tese_anova <- df_combined_concentration %>% 
+	select(peptide, subjectID, tese, concentration_ug_ml) %>% 
+	filter(!tese=="unknown") %>%
+	anova_posthoc("tese") 	
+
+tese_kruskal <- df_combined_concentration %>% 
+	select(peptide, subjectID, tese, concentration_ug_ml) %>% 
+	filter(!tese=="unknown") %>%
+	kruskal_dunn("tese") 	
+
+
 
 # # ----- Epididymal
 

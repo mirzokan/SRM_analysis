@@ -421,6 +421,7 @@ anova_posthoc <- function(df, group_by){
 			tibble::rownames_to_column("combinations") %>%
 			mutate(peptide=target) %>% 
 			select(peptide, everything()) %>% 
+			filter(p<=thrAlpha) %>% 
 			bind_rows(duncan_results,.)
 
 		# Tukey
@@ -430,6 +431,7 @@ anova_posthoc <- function(df, group_by){
 			tibble::rownames_to_column("combinations") %>%
 			mutate(peptide=target) %>% 
 			select(peptide, everything()) %>% 
+			filter(p<=thrAlpha) %>% 
 			bind_rows(tukey_results,.)
 	}
 
@@ -475,6 +477,7 @@ kruskal_dunn <- function(df, group_by){
 
 		# Dunn
 		dunn_results <- data.frame(peptide=target, combinations=dunn_model[[target]][["comparisons"]], p=dunn_model[[target]][["P.adjusted"]]) %>% 
+		filter(p<=thrAlpha) %>% 
 		bind_rows(dunn_results,.)
 	}
 
