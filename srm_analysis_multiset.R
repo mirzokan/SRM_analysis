@@ -23,8 +23,8 @@ library("dunn.test")
 xl_out <- FALSE
 graph_out <- TRUE
 lod_out <- FALSE
-strip_out <- FALSE
-cormat_out <- TRUE
+strip_out <- TRUE
+cormat_out <- FALSE
 volcano_out <- FALSE
 logit_out <- FALSE
 auc_out <- FALSE
@@ -70,7 +70,7 @@ set2_files <- list(
 			)
 set2_botched_list <- c(134,135,114,115,116,117)
 
-df_set2 <- load_skyline(set2_files, set=set2, remove_botched=FALSE, botched_list=set2_botched_list)
+df_set2 <- load_skyline(set2_files, set=set2, remove_botched=TRUE, botched_list=set2_botched_list)
 df_tidy_set2 <- tidify_df(df_set2)
 
 
@@ -80,12 +80,10 @@ set3_files <- list(
 			lib_pep_conc="C:\\Users\\lem\\Dropbox\\LTRI\\0 Projects\\NextGen Infertility Markers\\Results\\2017-09-18 TEX101 longitutional\\06 Reanalysis\\peptconc.csv"
 			)
 
-# set3_botched_list <- c(24, 26, 28, 37, 40, 42, 44, 49, 51, 53, 55, 76, 78, 80, 82, 105, 107, 109, 130, 132, 134, 136, 159, 161, 163, 184, 186, 188, 190, 208, 211, 213)
+set3_botched_list <- c(24, 26, 28, 37, 40, 42, 44, 49, 51, 53, 55, 76, 78, 80, 82, 105, 107, 109, 130, 132, 134, 136, 159, 161, 163, 184, 186, 188, 190, 208, 211, 213)
 
-df_set3 <- load_skyline(set3_files, set=set3, remove_botched=FALSE, botched_list=set3_botched_list)
+df_set3 <- load_skyline(set3_files, set=set3, remove_botched=TRUE, botched_list=set3_botched_list)
 df_tidy_set3 <- tidify_df(df_set3)
-
-
 
 
 set4 <- "calibration_curve"
@@ -97,6 +95,9 @@ set4_files <- list(
 df_set4 <- load_skyline(set4_files, set=set4, remove_botched=FALSE)
 df_tidy_set4 <- tidify_df(df_set4)
 
+
+
+# ----- Combine datasets
 df_combined <- bind_rows(df_set1, df_set2, df_set3)
 df_tidy_combined <- bind_rows(df_tidy_set1, df_tidy_set2, df_tidy_set3)
 
@@ -107,7 +108,6 @@ rm(df_set1, df_set2, df_set3, df_tidy_set1, df_tidy_set2, df_tidy_set3)
 list_peptides <- unique(df_tidy_combined$peptide)
 
 # ----- Base Wrangling Ends
-
 
 #------------- Replicate averaging
 replicates <- replicate_average(df_tidy_combined)
@@ -120,7 +120,6 @@ df_combined_concentration <- peptide_concentrations(df_combined_replicate_means,
 
 #------------- Retention Time Analysis
 report_retention_time <- rt_analysis(df_tidy_combined)
-
 
 # ----- Lod
 if (graph_out & lod_out){
@@ -140,6 +139,8 @@ if (strip_out & graph_out){
 		strip_chart(df_combined_concentration, target, "tese", categories=c("sperm", "spermatids", "no sperm"), save=TRUE, boxplot=TRUE) 
 	}
 	strip_chart(df_combined_concentration, "facet", "condition", categories=c("PREvas", "POSTvas", "OA", "NOA"), save=TRUE) 
+	strip_chart(df_combined_concentration, "facet", "histology", save=TRUE) 
+	strip_chart(df_combined_concentration, "facet", "tese", categories=c("sperm", "spermatids", "no sperm"), save=TRUE) 
 }
 
 # ----- Protein concentration correlation

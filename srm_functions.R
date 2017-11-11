@@ -269,7 +269,6 @@ strip_chart <- function(df_concentration, target, x, categories=c(), bw=FALSE, p
 	p <- subD %>% 
 		ggplot(aes_string(x=x, y="concentration_ug_ml")) +
 		geom_hline(aes(yintercept=lod), linetype="longdash")+
-		geom_beeswarm(size=2, cex=2, groupOnX=TRUE) +
 		xlab(firstcap(x)) + ylab(expression("Concentration ("*mu*"g/mL)"))+
 		theme(text = element_text(size=15))+
 		theme(axis.text.x = element_text(angle = 90, hjust = 1))+
@@ -278,12 +277,17 @@ strip_chart <- function(df_concentration, target, x, categories=c(), bw=FALSE, p
 		
 
 		if (target=="facet"){
-			p <- p + facet_wrap(~ protein, scales="free_y", nrow=4)
+			p <- p + geom_beeswarm(size=0.7, cex=1, groupOnX=TRUE) +
+			facet_wrap(~ protein, scales="free_y", nrow=4)
+
 			target_protein <- "facet_"
 			g_width <- 14
 			g_height <- 7
 		} else{
-			p <- p + labs(title=sprintf("%s (%s)", target_protein, stage_label), subtitle=sprintf("%s...", substr(target,1,5)))
+		
+			p <- p + geom_beeswarm(size=2, cex=2, groupOnX=TRUE) +
+			labs(title=sprintf("%s (%s)", target_protein, stage_label), subtitle=sprintf("%s...", substr(target,1,5)))
+
 			g_width <- 7
 			g_height <- 7
 		}
