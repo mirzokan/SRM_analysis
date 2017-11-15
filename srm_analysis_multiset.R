@@ -21,9 +21,9 @@ library("dunn.test")
 
 # ----- Global control variables
 xl_out <- FALSE
-graph_out <- TRUE
+graph_out <- FALSE
 lod_out <- FALSE
-strip_out <- TRUE
+strip_out <- FALSE
 cormat_out <- FALSE
 volcano_out <- FALSE
 logit_out <- FALSE
@@ -181,6 +181,16 @@ tese_kruskal <- df_combined_concentration %>%
 	select(peptide, subjectID, tese, concentration_ug_ml) %>% 
 	filter(!tese=="unknown") %>%
 	kruskal_dunn("tese") 	
+
+
+# ----- Longitutional data analysis
+longit <- df_combined_concentration %>% 
+	distinct(subjectID, peptide, timepoint, .keep_all=TRUE) %>% 
+	group_by(subjectID) %>% 
+	filter(n()>length(list_peptides)) %>% 
+	ungroup()
+
+
 
 
 
