@@ -182,6 +182,7 @@ tese_kruskal <- df_combined_concentration %>%
 	filter(!tese=="unknown") %>%
 	kruskal_dunn("tese") 	
 
+# Δ need to sumarise the above in some sort of a report
 
 # # ----- Epididymal
 
