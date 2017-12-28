@@ -183,17 +183,6 @@ tese_kruskal <- df_combined_concentration %>%
 	kruskal_dunn("tese") 	
 
 
-# ----- Longitutional data analysis
-longit <- df_combined_concentration %>% 
-	distinct(subjectID, peptide, timepoint, .keep_all=TRUE) %>% 
-	group_by(subjectID) %>% 
-	filter(n()>length(list_peptides)) %>% 
-	ungroup()
-
-
-
-
-
 # # ----- Epididymal
 
 # epi_anova <- df_combined_concentration %>% 
