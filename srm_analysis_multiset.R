@@ -206,9 +206,9 @@ longit %<>%
 	left_join(longit, ., by="subjectID") %>% 
 	mutate(sdr=group_sd/total_sd)
 
-sd_p_longit <- sd_s_longit %>% 
-	group_by(peptide) %>% 
-	summarise(mean_sdr=mean(sdr))
+# sd_p_longit <- sd_s_longit %>% 
+# 	group_by(peptide) %>% 
+# 	summarise(mean_sdr=mean(sdr))
 
 if (TRUE){
 # if (graph_out){
