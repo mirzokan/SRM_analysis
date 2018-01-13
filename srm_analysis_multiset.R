@@ -184,6 +184,45 @@ tese_kruskal <- df_combined_concentration %>%
 
 # Δ need to sumarise the above in some sort of a report
 
+# ----- Longitutional data analysis
+longit <- df_combined_concentration %>% 
+	distinct(subjectID, peptide, timepoint, .keep_all=TRUE) %>% 
+	mutate(concentration_ug_ml=ifelse(concentration_ug_ml==0, 1, concentration_ug_ml)) %>% 
+	group_by(subjectID) %>% 
+	filter(n()>length(list_peptides)) %>% 
+	group_by(subjectID, peptide) %>% 
+	mutate(concentration_r=concentration_ug_ml/min(concentration_ug_ml)) %>% 
+	ungroup()
+
+longit %<>% 
+	group_by(peptide) %>% 
+	summarise(total_sd=sd(concentration_ug_ml)) %>% 
+	left_join(longit, ., by="peptide")
+
+longit %<>% 
+	group_by(subjectID, peptide) %>% 
+	summarise(group_sd=sd(concentration_ug_ml)) %>% 
+	left_join(longit, ., by="subjectID") %>% 
+	mutate(sdr=group_sd/total_sd)
+
+# sd_p_longit <- sd_s_longit %>% 
+# 	group_by(peptide) %>% 
+# 	summarise(mean_sdr=mean(sdr))
+
+if (TRUE){
+# if (graph_out){
+	for (subject in unique(longit$subjectID)){
+		p <- longit %>%
+			filter(subjectID==subject)  %>% 
+			ggplot(aes(x=timepoint, y=concentration_r, color=protein))+
+			geom_line()+
+			geom_point()
+
+			ggsave(paste("timepoints_", subject, ".jpg"), plot=p, device="jpg", height=7, width=7)
+	}		
+}
+
+
 # # ----- Epididymal
 
 # epi_anova <- df_combined_concentration %>% 
